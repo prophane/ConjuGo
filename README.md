@@ -189,6 +189,12 @@ Comportement:
 - SSO_EMAIL_HEADER (defaut: x-pangolin-email)
 - SSO_NAME_HEADER (defaut: x-pangolin-name)
 
+Le serveur accepte aussi des en-tetes de secours frequents (utile si Pangolin ne propose pas de mapping claims explicite):
+
+- sub: x-forwarded-user, x-auth-request-user, x-user, remote-user
+- email: x-forwarded-email, x-auth-request-email, x-email, remote-email
+- name: x-forwarded-name, x-auth-request-name, x-name, x-forwarded-preferred-username
+
 ### Variables de securite (docker-compose.yml)
 
 - TRUST_PROXY_HEADER (defaut: x-pangolin-trusted)
@@ -209,3 +215,23 @@ Configurer Pangolin pour forwarder vers Conjugo:
 - x-pangolin-email
 - x-pangolin-name
 - x-pangolin-trusted (valeur secrete, optionnelle mais recommandee)
+
+### Debug rapide quand aucun mapping claims n'apparait dans l'UI Pangolin
+
+Si ta version Pangolin ne montre pas d'ecran claims -> headers, tu peux verifier ce qui est vraiment forwarde:
+
+1. ouvrir /api/debug-identity derriere Pangolin
+2. regarder les headers effectivement recus
+3. ajuster SSO_SUB_HEADER / SSO_EMAIL_HEADER / SSO_NAME_HEADER si necessaire
+
+Commande de test:
+
+```bash
+curl -s https://conjugo.ph4.fr/api/debug-identity
+```
+
+Puis test final:
+
+```bash
+curl -s https://conjugo.ph4.fr/api/me
+```

@@ -12,6 +12,32 @@ const SSO_NAME_HEADER = (process.env.SSO_NAME_HEADER || "x-pangolin-name").toLow
 const TRUST_PROXY_HEADER = (process.env.TRUST_PROXY_HEADER || "x-pangolin-trusted").toLowerCase();
 const TRUST_PROXY_SECRET = process.env.TRUST_PROXY_SECRET || "";
 
+const SUB_HEADER_CANDIDATES = [
+  SSO_SUB_HEADER,
+  "x-forwarded-user",
+  "x-auth-request-user",
+  "x-user",
+  "remote-user"
+];
+
+const EMAIL_HEADER_CANDIDATES = [
+  SSO_EMAIL_HEADER,
+  "x-forwarded-email",
+  "x-auth-request-email",
+  "x-email",
+  "remote-email",
+  "x-ms-client-principal-name"
+];
+
+const NAME_HEADER_CANDIDATES = [
+  SSO_NAME_HEADER,
+  "x-forwarded-name",
+  "x-auth-request-name",
+  "x-name",
+  "x-forwarded-preferred-username",
+  "x-ms-client-principal-name"
+];
+
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
@@ -63,6 +89,21 @@ function getHeader(request, name) {
   return value || "";
 }
 
+function uniqueNames(names) {
+  return [...new Set(names.map((name) => name.toLowerCase()))];
+}
+
+function readFirstHeader(request, candidates) {
+  const names = uniqueNames(candidates);
+  for (const name of names) {
+    const value = getHeader(request, name).trim();
+    if (value) {
+      return { headerName: name, value };
+    }
+  }
+  return { headerName: "", value: "" };
+}
+
 function ensureTrustedProxy(request) {
   if (!TRUST_PROXY_SECRET) {
     return true;
@@ -75,9 +116,13 @@ function upsertUserFromHeaders(request) {
     return { error: "forbidden", statusCode: 403 };
   }
 
-  const providerSubject = getHeader(request, SSO_SUB_HEADER).trim();
-  const email = normalizeEmail(getHeader(request, SSO_EMAIL_HEADER));
-  const displayName = getHeader(request, SSO_NAME_HEADER).trim() || email || providerSubject;
+  const subjectCandidate = readFirstHeader(request, SUB_HEADER_CANDIDATES);
+  const emailCandidate = readFirstHeader(request, EMAIL_HEADER_CANDIDATES);
+  const nameCandidate = readFirstHeader(request, NAME_HEADER_CANDIDATES);
+
+  const providerSubject = subjectCandidate.value;
+  const email = normalizeEmail(emailCandidate.value);
+  const displayName = nameCandidate.value || email || providerSubject;
 
   if (!providerSubject && !email) {
     return { error: "missing_identity", statusCode: 401 };
@@ -118,7 +163,34 @@ function upsertUserFromHeaders(request) {
   }
 
   safeWriteJson(USER_DB_FILE, store);
-  return { user };
+  return {
+    user,
+    identitySource: {
+      subHeader: subjectCandidate.headerName,
+      emailHeader: emailCandidate.headerName,
+      nameHeader: nameCandidate.headerName
+    }
+  };
+}
+
+function pickRelevantHeaders(request) {
+  const allowPattern = /(pangolin|auth|user|email|name|forwarded|remote|principal)/i;
+  const result = {};
+
+  Object.entries(request.headers).forEach(([name, value]) => {
+    if (!allowPattern.test(name)) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      result[name] = value[0] || "";
+      return;
+    }
+
+    result[name] = value || "";
+  });
+
+  return result;
 }
 
 function serveStatic(request, response) {
@@ -178,9 +250,26 @@ const server = http.createServer((request, response) => {
       ok: true,
       service: "conjugo",
       ssoHeaders: {
-        sub: SSO_SUB_HEADER,
-        email: SSO_EMAIL_HEADER,
-        name: SSO_NAME_HEADER
+        sub: uniqueNames(SUB_HEADER_CANDIDATES),
+        email: uniqueNames(EMAIL_HEADER_CANDIDATES),
+        name: uniqueNames(NAME_HEADER_CANDIDATES)
+      }
+    });
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/debug-identity") {
+    if (!ensureTrustedProxy(request)) {
+      sendJson(response, 403, { error: "forbidden" });
+      return;
+    }
+
+    sendJson(response, 200, {
+      relevantHeaders: pickRelevantHeaders(request),
+      configuredHeaderPriority: {
+        sub: uniqueNames(SUB_HEADER_CANDIDATES),
+        email: uniqueNames(EMAIL_HEADER_CANDIDATES),
+        name: uniqueNames(NAME_HEADER_CANDIDATES)
       }
     });
     return;
@@ -193,7 +282,7 @@ const server = http.createServer((request, response) => {
       return;
     }
 
-    sendJson(response, 200, { user: result.user });
+    sendJson(response, 200, { user: result.user, identitySource: result.identitySource });
     return;
   }
 
