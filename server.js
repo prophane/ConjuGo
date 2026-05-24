@@ -34,6 +34,7 @@ const NAME_HEADER_CANDIDATES = [
   "x-forwarded-name",
   "x-auth-request-name",
   "x-name",
+  "remote-name",
   "x-forwarded-preferred-username",
   "x-ms-client-principal-name"
 ];
