@@ -40,6 +40,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  if (requestUrl.pathname.startsWith("/api/")) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   const isAppShellFile = /\.(html|js|css|webmanifest)$/i.test(requestUrl.pathname);
 
   if (event.request.mode === "navigate" || isAppShellFile) {

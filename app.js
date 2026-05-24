@@ -11,7 +11,8 @@ const state = {
   currentIndex: 0,
   score: 0,
   errors: [],
-  answered: false
+  answered: false,
+  user: null
 };
 
 let deferredInstallPrompt = null;
@@ -42,6 +43,50 @@ const el = {
   backConfigBtn: document.getElementById("backConfigBtn"),
   questionCard: document.getElementById("questionCard")
 };
+
+function toFirstName(fullName) {
+  if (!fullName || typeof fullName !== "string") {
+    return "";
+  }
+  return fullName.trim().split(/\s+/)[0] || "";
+}
+
+function renderUserHeader() {
+  const subtitleEl = document.getElementById("subtitleText");
+  const userLineEl = document.getElementById("userLine");
+
+  if (!subtitleEl || !userLineEl) {
+    return;
+  }
+
+  if (!state.user) {
+    subtitleEl.textContent = "Le mini-jeu du present";
+    userLineEl.hidden = true;
+    return;
+  }
+
+  const firstName = toFirstName(state.user.displayName) || "champion";
+  subtitleEl.textContent = "Le mini-jeu du present";
+  userLineEl.textContent = `Connecte: ${firstName}`;
+  userLineEl.hidden = false;
+}
+
+async function loadConnectedUser() {
+  try {
+    const response = await fetch("/api/me", { cache: "no-store" });
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = await response.json();
+    if (payload && payload.user) {
+      state.user = payload.user;
+      renderUserHeader();
+    }
+  } catch (_error) {
+    // Front remains usable even if backend user API is unavailable.
+  }
+}
 
 function shuffle(list) {
   const copy = [...list];
@@ -438,10 +483,13 @@ function init() {
     versionEl.textContent = APP_VERSION;
   }
 
+  renderUserHeader();
+
   loadPreferences();
   updateConfigUI();
   bindEvents();
   bindPwaInstall();
+  loadConnectedUser();
 }
 
 init();

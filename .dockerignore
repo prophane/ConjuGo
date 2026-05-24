@@ -3,3 +3,5 @@
 .vscode
 README.md
 DESIGN.md
+node_modules
+data/users.json

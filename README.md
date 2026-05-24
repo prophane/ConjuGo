@@ -1,7 +1,7 @@
 # Conjugo Pop (MVP CE1)
 
-Application web PWA statique pour s'entrainer a la conjugaison au present (niveau CE1).
-Aucun backend n'est requis pour le MVP.
+Application web PWA pour s'entrainer a la conjugaison au present (niveau CE1).
+Le mode de base fonctionne sans backend metier. Cette version inclut en plus une mini API locale pour auto-creer les utilisateurs via SSO Pangolin.
 
 ## 1) Note de conception courte
 
@@ -17,6 +17,7 @@ Aucun backend n'est requis pour le MVP.
 - styles.css: design system, responsive mobile-first, animations courtes
 - data.js: dataset initial des verbes + pronoms + groupes
 - app.js: logique de session, generation des questions, feedback, PWA install
+- server.js: serveur Node (fichiers statiques + API /api/me + auto-provisioning utilisateur)
 - manifest.webmanifest: metadonnees PWA
 - sw.js: service worker (cache static)
 - icons/icon-192.svg: icone PWA
@@ -111,8 +112,8 @@ Puis ouvrir:
 Le projet inclut maintenant:
 
 - Dockerfile
-- nginx.conf
 - docker-compose.yml
+- server.js
 
 Le conteneur expose le service sur le port 3077.
 
@@ -134,7 +135,7 @@ docker compose down
 
 ## 11) Deploiement sur machine Ampere (ARM64)
 
-L'image de base nginx:alpine est multi-architecture et fonctionne sur ARM64 (Ampere).
+L'image de base node:20-alpine est multi-architecture et fonctionne sur ARM64 (Ampere).
 
 ### Option simple (sur la machine Ampere)
 
@@ -165,3 +166,46 @@ docker run -d --name conjugo-pwa -p 3077:3077 --restart unless-stopped <votre-re
 Le reverse proxy peut router vers:
 
 - http://<ip-machine-ampere>:3077
+
+## 12) Auto-creation utilisateur via SSO Pangolin
+
+Objectif: recuperer l'identite envoyee par Pangolin et creer automatiquement un compte local au premier acces.
+
+### Endpoint
+
+- GET /api/me
+
+Comportement:
+
+1. Lit les headers SSO recus depuis Pangolin.
+2. Cherche un utilisateur existant (email ou subject fournisseur).
+3. Cree l'utilisateur si absent.
+4. Met a jour lastSeenAt.
+5. Retourne le profil JSON.
+
+### Headers attendus (configurables via variables d'environnement)
+
+- SSO_SUB_HEADER (defaut: x-pangolin-sub)
+- SSO_EMAIL_HEADER (defaut: x-pangolin-email)
+- SSO_NAME_HEADER (defaut: x-pangolin-name)
+
+### Variables de securite (docker-compose.yml)
+
+- TRUST_PROXY_HEADER (defaut: x-pangolin-trusted)
+- TRUST_PROXY_SECRET (defaut vide)
+
+Si TRUST_PROXY_SECRET est renseigne, /api/me exige ce header exact pour faire confiance a la requete.
+
+### Persistance
+
+- Les utilisateurs sont stockes dans data/users.json
+- Le volume ./data:/app/data conserve les comptes entre redemarrages
+
+### Exemple Pangolin (concept)
+
+Configurer Pangolin pour forwarder vers Conjugo:
+
+- x-pangolin-sub
+- x-pangolin-email
+- x-pangolin-name
+- x-pangolin-trusted (valeur secrete, optionnelle mais recommandee)

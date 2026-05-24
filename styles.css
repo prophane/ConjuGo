@@ -120,6 +120,13 @@ h1 {
   color: var(--muted);
 }
 
+.user-line {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #0369a1;
+}
+
 .app-shell {
   width: min(760px, 100%);
   margin: 0 auto;

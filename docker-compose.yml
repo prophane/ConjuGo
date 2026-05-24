@@ -6,4 +6,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3077:3077"
+    environment:
+      - PORT=3077
+      - USER_DB_FILE=/app/data/users.json
+      - SSO_SUB_HEADER=x-pangolin-sub
+      - SSO_EMAIL_HEADER=x-pangolin-email
+      - SSO_NAME_HEADER=x-pangolin-name
+      - TRUST_PROXY_HEADER=x-pangolin-trusted
+      - TRUST_PROXY_SECRET=
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
