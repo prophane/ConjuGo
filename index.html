@@ -59,10 +59,41 @@
 
         <div class="selection-box" id="selectionSummary" aria-live="polite">Aucune categorie selectionnee.</div>
 
-        <button id="startBtn" class="cta" disabled>Commencer (10 questions)</button>
+        <div class="home-actions">
+          <button id="startBtn" class="cta" disabled>Commencer (10 questions)</button>
+          <button id="progressBtn" class="ghost strong">Ma progression</button>
+        </div>
+      </section>
+
+      <section id="view-progress" class="view" aria-labelledby="progress-title">
+        <div class="progress-header">
+          <div>
+            <h2 id="progress-title">Ma progression</h2>
+            <p class="hint">Niveau, xp, recompenses et collection.</p>
+          </div>
+          <button id="backTrainingBtn" class="ghost strong">Retour entrainement</button>
+        </div>
+
+        <section class="level-panel" aria-labelledby="levelTitle">
+          <h3 id="levelTitle">Niveau actuel</h3>
+          <div class="level-hero">
+            <div class="level-badge">
+              <strong id="progressLevel">1</strong>
+              <span>NIVEAU</span>
+            </div>
+            <div class="level-copy">
+              <p id="progressLevelLabel">Petit verbe</p>
+              <p id="progressXpText">0 / 100 xp</p>
+            </div>
+          </div>
+          <div class="progression-track" aria-hidden="true">
+            <span id="progressXpBar"></span>
+          </div>
+          <p id="progressNextGoal" class="hint">Encore 100 xp pour le prochain niveau.</p>
+        </section>
 
         <section class="tracker-panel" aria-labelledby="trackerTitle">
-          <h3 id="trackerTitle">Mon suivi</h3>
+          <h3 id="trackerTitle">Mes stats</h3>
           <div class="tracker-grid">
             <p>Sessions: <strong id="statSessions">0</strong></p>
             <p>Meilleur score: <strong id="statBest">0/10</strong></p>
@@ -136,6 +167,7 @@
 
         <div class="result-actions">
           <button id="replayBtn" class="cta">Rejouer</button>
+          <button id="openProgressFromResultBtn" class="ghost strong">Voir ma progression</button>
           <button id="backConfigBtn" class="ghost strong">Changer la selection</button>
         </div>
       </section>

@@ -45,6 +45,8 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - Galerie de stickers originaux style brainy/arcade (assets locaux)
 - Pack de cartes a la fin de chaque session (common/rare/epic)
 - Collection locale avec suivi des doublons
+- Page dediee progression: niveau, xp, badges, collection
+- Gestion pedagogique des contractions: je -> j' devant voyelle/h muet
 
 ## 4) Logique de generation (anti-repetition)
 

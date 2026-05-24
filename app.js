@@ -4,7 +4,7 @@ const SESSION_SIZE = 10;
 const RECENT_VERB_WINDOW = 2;
 const STORAGE_KEY = "conjugo-preferences-v1";
 const PROGRESS_KEY = "conjugo-progress-v1";
-const APP_VERSION = "v2026.05.24.5";
+const APP_VERSION = "v2026.05.24.6";
 
 const STICKER_SOURCES = [
   "./stickers/brainy-rocket.svg",
@@ -51,6 +51,15 @@ const REWARD_DEFS = [
   { id: "streak_3", label: "Serie x3", check: (p) => p.currentStreak >= 3 }
 ];
 
+const LEVEL_SIZE = 100;
+const LEVEL_LABELS = [
+  "Petit verbe",
+  "Mini héros",
+  "Turbo conjugueur",
+  "Champion du present",
+  "Boss des verbes"
+];
+
 const state = {
   selected: new Set(),
   questions: [],
@@ -73,12 +82,16 @@ let deferredInstallPrompt = null;
 const el = {
   views: {
     config: document.getElementById("view-config"),
+    progress: document.getElementById("view-progress"),
     session: document.getElementById("view-session"),
     result: document.getElementById("view-result")
   },
   cards: Array.from(document.querySelectorAll(".cat-card")),
   selectionSummary: document.getElementById("selectionSummary"),
   startBtn: document.getElementById("startBtn"),
+  progressBtn: document.getElementById("progressBtn"),
+  backTrainingBtn: document.getElementById("backTrainingBtn"),
+  openProgressFromResultBtn: document.getElementById("openProgressFromResultBtn"),
   installBtn: document.getElementById("installBtn"),
   counter: document.getElementById("counter"),
   progressBar: document.getElementById("progressBar"),
@@ -99,6 +112,11 @@ const el = {
   statBest: document.getElementById("statBest"),
   statAccuracy: document.getElementById("statAccuracy"),
   statCoins: document.getElementById("statCoins"),
+  progressLevel: document.getElementById("progressLevel"),
+  progressLevelLabel: document.getElementById("progressLevelLabel"),
+  progressXpText: document.getElementById("progressXpText"),
+  progressXpBar: document.getElementById("progressXpBar"),
+  progressNextGoal: document.getElementById("progressNextGoal"),
   badgeWall: document.getElementById("badgeWall"),
   collectionGrid: document.getElementById("collectionGrid"),
   earnedCoins: document.getElementById("earnedCoins"),
@@ -161,8 +179,23 @@ function defaultProgress() {
     currentStreak: 0,
     maxStreak: 0,
     coins: 0,
+    xp: 0,
     badges: [],
     collection: {}
+  };
+}
+
+function getProgressLevel(progress) {
+  const level = Math.floor((progress.xp || 0) / LEVEL_SIZE) + 1;
+  const xpIntoLevel = (progress.xp || 0) % LEVEL_SIZE;
+  const xpToNext = LEVEL_SIZE - xpIntoLevel;
+
+  return {
+    level,
+    xpIntoLevel,
+    xpToNext,
+    progressRatio: (xpIntoLevel / LEVEL_SIZE) * 100,
+    label: LEVEL_LABELS[Math.min(LEVEL_LABELS.length - 1, level - 1)]
   };
 }
 
@@ -195,6 +228,23 @@ function renderProgressPanel() {
   const accuracy = state.progress.totalQuestions
     ? Math.round((state.progress.totalCorrect / state.progress.totalQuestions) * 100)
     : 0;
+  const levelInfo = getProgressLevel(state.progress);
+
+  if (el.progressLevel) {
+    el.progressLevel.textContent = String(levelInfo.level);
+  }
+  if (el.progressLevelLabel) {
+    el.progressLevelLabel.textContent = levelInfo.label;
+  }
+  if (el.progressXpText) {
+    el.progressXpText.textContent = `${levelInfo.xpIntoLevel} / ${LEVEL_SIZE} xp`;
+  }
+  if (el.progressXpBar) {
+    el.progressXpBar.style.width = `${levelInfo.progressRatio}%`;
+  }
+  if (el.progressNextGoal) {
+    el.progressNextGoal.textContent = `Encore ${levelInfo.xpToNext} xp pour le prochain niveau.`;
+  }
 
   if (el.statSessions) {
     el.statSessions.textContent = String(state.progress.sessionsCount);
@@ -273,6 +323,8 @@ function applySessionRewards() {
 
   const earnedCoins = state.score + (state.score === SESSION_SIZE ? 4 : 0);
   progress.coins += earnedCoins;
+  const earnedXp = state.score * 10 + (state.score === SESSION_SIZE ? 20 : 0) + (state.score >= 8 ? 10 : 0);
+  progress.xp += earnedXp;
 
   const drawnCard = drawRewardCard(state.score);
   const previousCount = Number(progress.collection[drawnCard.id] || 0);
@@ -298,7 +350,8 @@ function applySessionRewards() {
     coins: earnedCoins + (drawnCard.rarity === "Epic" ? 3 : drawnCard.rarity === "Rare" ? 1 : 0),
     unlocked: unlockedNow,
     card: drawnCard,
-    wasNewCard
+    wasNewCard,
+    xp: earnedXp
   };
 
   saveProgress();
@@ -344,6 +397,12 @@ function renderSessionRewards() {
         el.rewardUnlockedList.appendChild(li);
       });
     }
+  }
+
+  if (el.rewardUnlockedList && state.sessionReward.xp) {
+    const xpLi = document.createElement("li");
+    xpLi.textContent = `XP gagnee: ${state.sessionReward.xp}`;
+    el.rewardUnlockedList.appendChild(xpLi);
   }
 
   if (el.rewardCard) {
@@ -607,7 +666,7 @@ function renderQuestion() {
 
   el.pronounBadge.textContent = question.pronounLabel;
   el.verbLabel.textContent = question.verb;
-  el.questionExplain.textContent = `Complete: ${question.pronounLabel} ___ (${question.verb})`;
+  el.questionExplain.textContent = `Complete: ${getPromptPronoun(question)} ___ (${question.verb})`;
 
   el.feedback.hidden = true;
   el.feedbackText.textContent = "";
@@ -647,16 +706,16 @@ function validateAnswer(selectedText, clickedButton) {
 
   if (ok) {
     state.score += 1;
-    el.feedbackText.textContent = `Super! ${question.pronounLabel} ${correctForm}.`;
+    el.feedbackText.textContent = `Super! ${formatFullAnswer(question, correctForm)}.`;
     triggerRewardAnimation();
   } else {
     state.errors.push({
       verb: question.verb,
       pronoun: question.pronounLabel,
-      expected: `${question.pronounLabel} ${correctForm}`,
+      expected: formatFullAnswer(question, correctForm),
       selected: selectedText
     });
-    el.feedbackText.textContent = `Presque! La bonne phrase: ${question.pronounLabel} ${correctForm}.`;
+    el.feedbackText.textContent = `Presque! La bonne phrase: ${formatFullAnswer(question, correctForm)}.`;
   }
 
   el.feedback.hidden = false;
@@ -690,6 +749,30 @@ function scoreMessage(score) {
     return "Excellent! Tu conjugues tres bien au present!";
   }
   return "Parfait 10/10! Tu es le boss du present!";
+}
+
+function isElidedPronoun(question) {
+  if (question.pronounKey !== "je") {
+    return false;
+  }
+
+  return /^[aeiouyh]/i.test(question.verb);
+}
+
+function getPromptPronoun(question) {
+  if (isElidedPronoun(question)) {
+    return "j'";
+  }
+  return question.pronounLabel;
+}
+
+function formatFullAnswer(question, correctForm) {
+  return `${getPromptPronoun(question)}${isElidedPronoun(question) ? "" : " "}${correctForm}`;
+}
+
+function navigateToProgress() {
+  showView("progress");
+  renderProgressPanel();
 }
 
 function showResults() {
@@ -734,6 +817,11 @@ function backToConfig() {
   updateConfigUI();
 }
 
+function backToTraining() {
+  showView("config");
+  updateConfigUI();
+}
+
 function handleCategoryToggle(event) {
   const button = event.currentTarget;
   const category = button.dataset.category;
@@ -751,6 +839,9 @@ function handleCategoryToggle(event) {
 function bindEvents() {
   el.cards.forEach((card) => card.addEventListener("click", handleCategoryToggle));
   el.startBtn.addEventListener("click", startSession);
+  el.progressBtn.addEventListener("click", navigateToProgress);
+  el.backTrainingBtn.addEventListener("click", backToTraining);
+  el.openProgressFromResultBtn.addEventListener("click", navigateToProgress);
   el.nextBtn.addEventListener("click", nextQuestion);
   el.replayBtn.addEventListener("click", startSession);
   el.backConfigBtn.addEventListener("click", backToConfig);

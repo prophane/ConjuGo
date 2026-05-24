@@ -1,4 +1,4 @@
-const CACHE_NAME = "conjugo-pop-v4";
+const CACHE_NAME = "conjugo-pop-v5";
 const ASSETS = [
   "./",
   "./index.html",

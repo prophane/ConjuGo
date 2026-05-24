@@ -195,6 +195,88 @@ h1 {
   font-weight: 700;
 }
 
+.home-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.progress-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.progress-header .hint {
+  margin-bottom: 0;
+}
+
+.level-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: linear-gradient(135deg, #eff6ff, #fefce8);
+}
+
+.level-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.level-badge {
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #0ea5e9, #22c55e);
+  color: #fff;
+  box-shadow: var(--shadow);
+}
+
+.level-badge strong {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.level-badge span {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+}
+
+.level-copy p {
+  margin: 0;
+  font-weight: 800;
+}
+
+.level-copy p + p {
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.progression-track {
+  margin-top: 10px;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #dbeafe;
+  overflow: hidden;
+}
+
+.progression-track span {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f59e0b, #f43f5e);
+  transition: width 220ms ease;
+}
+
 .tracker-panel,
 .gallery-panel,
 .rewards-box {
@@ -498,6 +580,11 @@ h1 {
   display: grid;
   gap: 10px;
   margin-top: 14px;
+}
+
+.result-actions .ghost,
+.result-actions .cta {
+  margin-top: 0;
 }
 
 .rewards-box p {
