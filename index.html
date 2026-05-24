@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="description" content="Conjugo Pop - entrainement CE1 au present" />
+    <title>Conjugo Pop</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon-192.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-shapes" aria-hidden="true">
+      <span class="shape shape-a"></span>
+      <span class="shape shape-b"></span>
+      <span class="shape shape-c"></span>
+    </div>
+
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo">CP</div>
+        <div>
+          <h1>Conjugo Pop</h1>
+          <p class="subtitle">Le mini-jeu du present</p>
+        </div>
+      </div>
+      <button id="installBtn" class="ghost" hidden>Installer</button>
+    </header>
+
+    <main class="app-shell" id="appShell">
+      <section id="view-config" class="view active" aria-labelledby="config-title">
+        <h2 id="config-title">Choisis ton entrainement</h2>
+        <p class="hint">Selectionne au moins 1 categorie.</p>
+
+        <div class="grid-cards" id="categoryGrid" role="group" aria-label="Categories de verbes">
+          <button class="cat-card" data-category="etre" aria-pressed="false">
+            <span class="cat-icon">⭐</span>
+            <span class="cat-title">Etre</span>
+          </button>
+          <button class="cat-card" data-category="avoir" aria-pressed="false">
+            <span class="cat-icon">🎒</span>
+            <span class="cat-title">Avoir</span>
+          </button>
+          <button class="cat-card" data-category="g1" aria-pressed="false">
+            <span class="cat-icon">🚀</span>
+            <span class="cat-title">1er groupe</span>
+          </button>
+          <button class="cat-card" data-category="g2" aria-pressed="false">
+            <span class="cat-icon">🧩</span>
+            <span class="cat-title">2e groupe</span>
+          </button>
+          <button class="cat-card" data-category="g3" aria-pressed="false">
+            <span class="cat-icon">🎮</span>
+            <span class="cat-title">3e groupe</span>
+          </button>
+        </div>
+
+        <div class="selection-box" id="selectionSummary" aria-live="polite">Aucune categorie selectionnee.</div>
+
+        <button id="startBtn" class="cta" disabled>Commencer (10 questions)</button>
+      </section>
+
+      <section id="view-session" class="view" aria-labelledby="session-title">
+        <div class="session-top">
+          <h2 id="session-title">Mission conjugaison</h2>
+          <p id="counter" class="counter">Question 1/10</p>
+          <div class="progress" aria-hidden="true">
+            <span id="progressBar"></span>
+          </div>
+        </div>
+
+        <article class="question-card" id="questionCard">
+          <p class="prompt-line">
+            <span id="pronounBadge" class="badge">je</span>
+            <span class="verb-inline" id="verbLabel">manger</span>
+          </p>
+          <p class="hint">Choisis la bonne forme au present.</p>
+
+          <div class="options" id="optionsWrap"></div>
+
+          <div id="feedback" class="feedback" aria-live="polite" hidden>
+            <p id="feedbackText"></p>
+            <button id="nextBtn" class="cta small">Question suivante</button>
+          </div>
+        </article>
+      </section>
+
+      <section id="view-result" class="view" aria-labelledby="result-title">
+        <h2 id="result-title">Bravo, session terminee</h2>
+        <p id="scoreLine" class="score">Score: 0/10</p>
+        <p id="resultMessage" class="result-message"></p>
+
+        <div class="error-box">
+          <h3>Petit recap</h3>
+          <ul id="errorList"></ul>
+        </div>
+
+        <div class="result-actions">
+          <button id="replayBtn" class="cta">Rejouer</button>
+          <button id="backConfigBtn" class="ghost strong">Changer la selection</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">Present CE1 · fun et progressif</footer>
+
+    <script src="./data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
