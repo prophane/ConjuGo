@@ -3,7 +3,22 @@
 const SESSION_SIZE = 10;
 const RECENT_VERB_WINDOW = 2;
 const STORAGE_KEY = "conjugo-preferences-v1";
-const APP_VERSION = "v2026.05.24.3";
+const PROGRESS_KEY = "conjugo-progress-v1";
+const APP_VERSION = "v2026.05.24.4";
+
+const STICKER_SOURCES = [
+  "./stickers/brainy-rocket.svg",
+  "./stickers/brainy-shark.svg",
+  "./stickers/brainy-toast.svg",
+  "./stickers/brainy-slime.svg"
+];
+
+const REWARD_DEFS = [
+  { id: "first_session", label: "Premier pas", check: (p) => p.sessionsCount >= 1 },
+  { id: "sharp_30", label: "30 bonnes reponses", check: (p) => p.totalCorrect >= 30 },
+  { id: "ace_10", label: "Score parfait", check: (p, s) => s >= 10 },
+  { id: "streak_3", label: "Serie x3", check: (p) => p.currentStreak >= 3 }
+];
 
 const state = {
   selected: new Set(),
@@ -12,7 +27,12 @@ const state = {
   score: 0,
   errors: [],
   answered: false,
-  user: null
+  user: null,
+  progress: null,
+  sessionReward: {
+    coins: 0,
+    unlocked: []
+  }
 };
 
 let deferredInstallPrompt = null;
@@ -41,7 +61,16 @@ const el = {
   errorList: document.getElementById("errorList"),
   replayBtn: document.getElementById("replayBtn"),
   backConfigBtn: document.getElementById("backConfigBtn"),
-  questionCard: document.getElementById("questionCard")
+  questionCard: document.getElementById("questionCard"),
+  statSessions: document.getElementById("statSessions"),
+  statBest: document.getElementById("statBest"),
+  statAccuracy: document.getElementById("statAccuracy"),
+  statCoins: document.getElementById("statCoins"),
+  badgeWall: document.getElementById("badgeWall"),
+  earnedCoins: document.getElementById("earnedCoins"),
+  rewardUnlockedList: document.getElementById("rewardUnlockedList"),
+  mascotImage: document.getElementById("mascotImage"),
+  mascotText: document.getElementById("mascotText")
 };
 
 function toFirstName(fullName) {
@@ -88,6 +117,140 @@ async function loadConnectedUser() {
   }
 }
 
+function defaultProgress() {
+  return {
+    sessionsCount: 0,
+    totalQuestions: 0,
+    totalCorrect: 0,
+    bestScore: 0,
+    currentStreak: 0,
+    maxStreak: 0,
+    coins: 0,
+    badges: []
+  };
+}
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(PROGRESS_KEY);
+    if (!raw) {
+      state.progress = defaultProgress();
+      return;
+    }
+    const parsed = JSON.parse(raw);
+    state.progress = { ...defaultProgress(), ...parsed };
+  } catch (_error) {
+    state.progress = defaultProgress();
+  }
+}
+
+function saveProgress() {
+  if (!state.progress) {
+    return;
+  }
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify(state.progress));
+}
+
+function renderProgressPanel() {
+  if (!state.progress) {
+    return;
+  }
+
+  const accuracy = state.progress.totalQuestions
+    ? Math.round((state.progress.totalCorrect / state.progress.totalQuestions) * 100)
+    : 0;
+
+  if (el.statSessions) {
+    el.statSessions.textContent = String(state.progress.sessionsCount);
+  }
+  if (el.statBest) {
+    el.statBest.textContent = `${state.progress.bestScore}/${SESSION_SIZE}`;
+  }
+  if (el.statAccuracy) {
+    el.statAccuracy.textContent = `${accuracy}%`;
+  }
+  if (el.statCoins) {
+    el.statCoins.textContent = String(state.progress.coins);
+  }
+
+  if (el.badgeWall) {
+    el.badgeWall.innerHTML = "";
+    if (!state.progress.badges.length) {
+      const empty = document.createElement("span");
+      empty.className = "badge-chip";
+      empty.textContent = "Aucun badge pour l'instant";
+      el.badgeWall.appendChild(empty);
+    } else {
+      state.progress.badges.forEach((badge) => {
+        const chip = document.createElement("span");
+        chip.className = "badge-chip";
+        chip.textContent = badge;
+        el.badgeWall.appendChild(chip);
+      });
+    }
+  }
+}
+
+function applySessionRewards() {
+  const progress = state.progress;
+  if (!progress) {
+    return;
+  }
+
+  progress.sessionsCount += 1;
+  progress.totalQuestions += SESSION_SIZE;
+  progress.totalCorrect += state.score;
+  progress.bestScore = Math.max(progress.bestScore, state.score);
+
+  if (state.score >= 8) {
+    progress.currentStreak += 1;
+  } else {
+    progress.currentStreak = 0;
+  }
+  progress.maxStreak = Math.max(progress.maxStreak, progress.currentStreak);
+
+  const earnedCoins = state.score + (state.score === SESSION_SIZE ? 4 : 0);
+  progress.coins += earnedCoins;
+
+  const unlockedNow = [];
+  REWARD_DEFS.forEach((reward) => {
+    const already = progress.badges.includes(reward.label);
+    if (!already && reward.check(progress, state.score)) {
+      progress.badges.push(reward.label);
+      unlockedNow.push(reward.label);
+    }
+  });
+
+  state.sessionReward = {
+    coins: earnedCoins,
+    unlocked: unlockedNow
+  };
+
+  saveProgress();
+  renderProgressPanel();
+}
+
+function renderSessionRewards() {
+  if (el.earnedCoins) {
+    el.earnedCoins.textContent = String(state.sessionReward.coins);
+  }
+
+  if (el.rewardUnlockedList) {
+    el.rewardUnlockedList.innerHTML = "";
+    if (!state.sessionReward.unlocked.length) {
+      const li = document.createElement("li");
+      li.textContent = "Continue, un badge arrive bientot!";
+      el.rewardUnlockedList.appendChild(li);
+    } else {
+      state.sessionReward.unlocked.forEach((badge) => {
+        const li = document.createElement("li");
+        li.textContent = `Nouveau badge: ${badge}`;
+        el.rewardUnlockedList.appendChild(li);
+      });
+    }
+  }
+}
+
 function shuffle(list) {
   const copy = [...list];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -95,6 +258,26 @@ function shuffle(list) {
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
+}
+
+function randomMascotMessage() {
+  const lines = [
+    "Mode turbo active!",
+    "Ton cerveau brille!",
+    "Combo en cours!",
+    "Let's pop conjugaison!"
+  ];
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+function setRandomMascot() {
+  if (el.mascotImage) {
+    const src = STICKER_SOURCES[Math.floor(Math.random() * STICKER_SOURCES.length)];
+    el.mascotImage.src = src;
+  }
+  if (el.mascotText) {
+    el.mascotText.textContent = randomMascotMessage();
+  }
 }
 
 function showView(name) {
@@ -294,6 +477,7 @@ function renderQuestion() {
   }
 
   state.answered = false;
+  setRandomMascot();
 
   el.counter.textContent = `Question ${state.currentIndex + 1}/${SESSION_SIZE}`;
   el.progressBar.style.width = `${((state.currentIndex + 1) / SESSION_SIZE) * 100}%`;
@@ -386,9 +570,11 @@ function scoreMessage(score) {
 }
 
 function showResults() {
+  applySessionRewards();
   showView("result");
   el.scoreLine.textContent = `Score: ${state.score}/${SESSION_SIZE}`;
   el.resultMessage.textContent = scoreMessage(state.score);
+  renderSessionRewards();
 
   el.errorList.innerHTML = "";
   if (!state.errors.length) {
@@ -414,6 +600,7 @@ function startSession() {
   state.currentIndex = 0;
   state.score = 0;
   state.errors = [];
+  state.sessionReward = { coins: 0, unlocked: [] };
 
   showView("session");
   renderQuestion();
@@ -486,7 +673,9 @@ function init() {
   renderUserHeader();
 
   loadPreferences();
+  loadProgress();
   updateConfigUI();
+  renderProgressPanel();
   bindEvents();
   bindPwaInstall();
   loadConnectedUser();

@@ -60,6 +60,27 @@
         <div class="selection-box" id="selectionSummary" aria-live="polite">Aucune categorie selectionnee.</div>
 
         <button id="startBtn" class="cta" disabled>Commencer (10 questions)</button>
+
+        <section class="tracker-panel" aria-labelledby="trackerTitle">
+          <h3 id="trackerTitle">Mon suivi</h3>
+          <div class="tracker-grid">
+            <p>Sessions: <strong id="statSessions">0</strong></p>
+            <p>Meilleur score: <strong id="statBest">0/10</strong></p>
+            <p>Precision: <strong id="statAccuracy">0%</strong></p>
+            <p>Pieces: <strong id="statCoins">0</strong></p>
+          </div>
+          <div class="badge-wall" id="badgeWall" aria-live="polite"></div>
+        </section>
+
+        <section class="gallery-panel" aria-labelledby="galleryTitle">
+          <h3 id="galleryTitle">Stickers brainy</h3>
+          <div class="sticker-grid">
+            <figure class="sticker-card"><img src="./stickers/brainy-rocket.svg" alt="Mascotte fusee" /></figure>
+            <figure class="sticker-card"><img src="./stickers/brainy-shark.svg" alt="Mascotte requin" /></figure>
+            <figure class="sticker-card"><img src="./stickers/brainy-toast.svg" alt="Mascotte toast" /></figure>
+            <figure class="sticker-card"><img src="./stickers/brainy-slime.svg" alt="Mascotte slime" /></figure>
+          </div>
+        </section>
       </section>
 
       <section id="view-session" class="view" aria-labelledby="session-title">
@@ -72,6 +93,10 @@
         </div>
 
         <article class="question-card" id="questionCard">
+          <div class="mascot-wrap">
+            <img id="mascotImage" src="./stickers/brainy-rocket.svg" alt="Mascotte du tour" />
+            <p id="mascotText">Let's go!</p>
+          </div>
           <p class="prompt-line">
             <span id="pronounBadge" class="badge">je</span>
             <span class="verb-inline" id="verbLabel">manger</span>
@@ -92,6 +117,11 @@
         <h2 id="result-title">Bravo, session terminee</h2>
         <p id="scoreLine" class="score">Score: 0/10</p>
         <p id="resultMessage" class="result-message"></p>
+
+        <div class="rewards-box">
+          <p>Pieces gagnees: <strong id="earnedCoins">0</strong></p>
+          <ul id="rewardUnlockedList"></ul>
+        </div>
 
         <div class="error-box">
           <h3>Petit recap</h3>

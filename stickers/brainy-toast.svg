@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Mascotte toast">
+  <rect width="128" height="128" rx="28" fill="#fff7ed"/>
+  <rect x="30" y="24" width="68" height="80" rx="20" fill="#fdba74"/>
+  <rect x="38" y="34" width="52" height="60" rx="16" fill="#ffedd5"/>
+  <circle cx="53" cy="60" r="3" fill="#7c2d12"/>
+  <circle cx="75" cy="60" r="3" fill="#7c2d12"/>
+  <path d="M52 74 Q64 84 76 74" stroke="#7c2d12" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="88" cy="32" r="10" fill="#f43f5e"/>
+</svg>

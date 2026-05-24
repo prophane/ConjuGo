@@ -1,4 +1,4 @@
-const CACHE_NAME = "conjugo-pop-v3";
+const CACHE_NAME = "conjugo-pop-v4";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,7 +7,11 @@ const ASSETS = [
   "./app.js",
   "./manifest.webmanifest",
   "./icons/icon-192.svg",
-  "./icons/icon-512.svg"
+  "./icons/icon-512.svg",
+  "./stickers/brainy-rocket.svg",
+  "./stickers/brainy-shark.svg",
+  "./stickers/brainy-toast.svg",
+  "./stickers/brainy-slime.svg"
 ];
 
 self.addEventListener("install", (event) => {

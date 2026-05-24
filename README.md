@@ -40,6 +40,9 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - Animation de recompense legere quand la reponse est correcte
 - Ecran final avec score, message motivant, recap des erreurs
 - Boutons Rejouer et Changer la selection
+- Suivi local: sessions, precision, meilleur score, pieces
+- Recompenses: badges debloques automatiquement
+- Galerie de stickers originaux style brainy/arcade (assets locaux)
 
 ## 4) Logique de generation (anti-repetition)
 

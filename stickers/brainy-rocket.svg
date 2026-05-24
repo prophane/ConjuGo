@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Mascotte fusee">
+  <rect width="128" height="128" rx="28" fill="#e0f2fe"/>
+  <ellipse cx="64" cy="66" rx="26" ry="40" fill="#0ea5e9"/>
+  <ellipse cx="64" cy="62" rx="14" ry="18" fill="#ffffff"/>
+  <path d="M64 22 L76 36 L52 36 Z" fill="#facc15"/>
+  <path d="M45 78 L32 92 L46 94 Z" fill="#fb7185"/>
+  <path d="M83 78 L96 92 L82 94 Z" fill="#fb7185"/>
+  <circle cx="59" cy="60" r="2" fill="#0f172a"/>
+  <circle cx="69" cy="60" r="2" fill="#0f172a"/>
+  <path d="M58 68 Q64 74 70 68" stroke="#0f172a" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>

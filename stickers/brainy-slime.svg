@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Mascotte slime">
+  <rect width="128" height="128" rx="28" fill="#ecfeff"/>
+  <path d="M30 80 Q26 52 44 44 Q48 32 62 34 Q74 26 88 36 Q102 40 100 62 Q104 74 96 90 Q80 100 56 98 Q36 96 30 80 Z" fill="#2dd4bf"/>
+  <circle cx="54" cy="62" r="3" fill="#0f172a"/>
+  <circle cx="74" cy="62" r="3" fill="#0f172a"/>
+  <path d="M54 74 Q64 82 74 74" stroke="#0f172a" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <circle cx="92" cy="46" r="5" fill="#facc15"/>
+</svg>
