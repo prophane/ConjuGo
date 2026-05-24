@@ -105,3 +105,63 @@ Puis ouvrir:
 5. Ajouter historique local de progression par date.
 6. Ajouter plus de verbes et filtrage CE1/CE2.
 7. Ajouter mode hors-ligne avance (strategie stale-while-revalidate).
+
+## 10) Deploiement Docker (port par defaut 3077)
+
+Le projet inclut maintenant:
+
+- Dockerfile
+- nginx.conf
+- docker-compose.yml
+
+Le conteneur expose le service sur le port 3077.
+
+### Lancer avec Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+Puis ouvrir:
+
+- http://localhost:3077
+
+### Arreter
+
+```bash
+docker compose down
+```
+
+## 11) Deploiement sur machine Ampere (ARM64)
+
+L'image de base nginx:alpine est multi-architecture et fonctionne sur ARM64 (Ampere).
+
+### Option simple (sur la machine Ampere)
+
+```bash
+docker compose up -d --build
+```
+
+### Option image prebuild (amd64 + arm64)
+
+Construire et publier une image multi-arch:
+
+```bash
+docker buildx create --use --name conjugo-builder
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t <votre-registry>/conjugo:latest \
+  --push .
+```
+
+Puis sur la machine Ampere:
+
+```bash
+docker run -d --name conjugo-pwa -p 3077:3077 --restart unless-stopped <votre-registry>/conjugo:latest
+```
+
+### Reverse proxy
+
+Le reverse proxy peut router vers:
+
+- http://<ip-machine-ampere>:3077

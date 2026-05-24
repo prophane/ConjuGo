@@ -1,0 +1,9 @@
+services:
+  conjugo:
+    container_name: conjugo-pwa
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3077:3077"
+    restart: unless-stopped
