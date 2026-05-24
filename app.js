@@ -3,6 +3,7 @@
 const SESSION_SIZE = 10;
 const RECENT_VERB_WINDOW = 2;
 const STORAGE_KEY = "conjugo-preferences-v1";
+const APP_VERSION = "v2026.05.24.3";
 
 const state = {
   selected: new Set(),
@@ -254,7 +255,7 @@ function renderQuestion() {
 
   el.pronounBadge.textContent = question.pronounLabel;
   el.verbLabel.textContent = question.verb;
-  el.questionExplain.textContent = `Avec ${question.pronounLabel} + ${question.verb}, j'ecris...`;
+  el.questionExplain.textContent = `Complete: ${question.pronounLabel} ___ (${question.verb})`;
 
   el.feedback.hidden = true;
   el.feedbackText.textContent = "";
@@ -294,7 +295,7 @@ function validateAnswer(selectedText, clickedButton) {
 
   if (ok) {
     state.score += 1;
-    el.feedbackText.textContent = `Super! Avec ${question.pronounLabel}, ${question.verb} devient ${correctForm}.`;
+    el.feedbackText.textContent = `Super! ${question.pronounLabel} ${correctForm}.`;
     triggerRewardAnimation();
   } else {
     state.errors.push({
@@ -303,7 +304,7 @@ function validateAnswer(selectedText, clickedButton) {
       expected: `${question.pronounLabel} ${correctForm}`,
       selected: selectedText
     });
-    el.feedbackText.textContent = `Presque! Avec ${question.pronounLabel}, il fallait ecrire ${correctForm}.`;
+    el.feedbackText.textContent = `Presque! La bonne phrase: ${question.pronounLabel} ${correctForm}.`;
   }
 
   el.feedback.hidden = false;
@@ -432,6 +433,11 @@ function bindPwaInstall() {
 }
 
 function init() {
+  const versionEl = document.getElementById("appVersion");
+  if (versionEl) {
+    versionEl.textContent = APP_VERSION;
+  }
+
   loadPreferences();
   updateConfigUI();
   bindEvents();

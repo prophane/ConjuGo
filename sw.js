@@ -1,4 +1,4 @@
-const CACHE_NAME = "conjugo-pop-v1";
+const CACHE_NAME = "conjugo-pop-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -32,6 +32,26 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
+    return;
+  }
+
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) {
+    return;
+  }
+
+  const isAppShellFile = /\.(html|js|css|webmanifest)$/i.test(requestUrl.pathname);
+
+  if (event.request.mode === "navigate" || isAppShellFile) {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return networkResponse;
+        })
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
+    );
     return;
   }
 
