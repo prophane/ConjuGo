@@ -29,6 +29,7 @@ const el = {
   progressBar: document.getElementById("progressBar"),
   pronounBadge: document.getElementById("pronounBadge"),
   verbLabel: document.getElementById("verbLabel"),
+  questionExplain: document.getElementById("questionExplain"),
   optionsWrap: document.getElementById("optionsWrap"),
   feedback: document.getElementById("feedback"),
   feedbackText: document.getElementById("feedbackText"),
@@ -135,6 +136,23 @@ function getCategoryCandidates(categoryKey) {
   return candidates;
 }
 
+function extractVerbForm(fullAnswer) {
+  if (fullAnswer.startsWith("j'")) {
+    return fullAnswer.slice(2).trim();
+  }
+
+  const firstSpace = fullAnswer.indexOf(" ");
+  if (firstSpace === -1) {
+    return fullAnswer.trim();
+  }
+
+  return fullAnswer.slice(firstSpace + 1).trim();
+}
+
+function findVerb(categoryKey, verbInfinitive) {
+  return CONJUGO_DATA.categories[categoryKey].verbs.find((verb) => verb.infinitive === verbInfinitive);
+}
+
 function generateQuestions(selectedCategories, total = SESSION_SIZE) {
   const usedPair = new Set();
   const recentVerbs = [];
@@ -197,36 +215,30 @@ function generateQuestions(selectedCategories, total = SESSION_SIZE) {
 }
 
 function buildMcqOptions(question, selectedCategories) {
+  const correctForm = extractVerbForm(question.answer);
   const pool = [];
+
+  const currentVerb = findVerb(question.categoryKey, question.verb);
+  Object.entries(currentVerb.forms).forEach(([pronounKey, fullForm]) => {
+    if (pronounKey !== question.pronounKey) {
+      pool.push(extractVerbForm(fullForm));
+    }
+  });
 
   selectedCategories.forEach((cat) => {
     const category = CONJUGO_DATA.categories[cat];
     category.verbs.forEach((verb) => {
-      const form = verb.forms[question.pronounKey];
-      if (form !== question.answer) {
+      const form = extractVerbForm(verb.forms[question.pronounKey]);
+      if (form !== correctForm) {
         pool.push(form);
       }
     });
   });
 
-  let distractors = shuffle([...new Set(pool)]).slice(0, 3);
+  const uniquePool = shuffle([...new Set(pool)].filter((form) => form !== correctForm));
+  const distractors = uniquePool.slice(0, 3);
 
-  if (distractors.length < 3) {
-    const fallback = [];
-    selectedCategories.forEach((cat) => {
-      CONJUGO_DATA.categories[cat].verbs.forEach((verb) => {
-        Object.values(verb.forms).forEach((f) => {
-          if (f !== question.answer) {
-            fallback.push(f);
-          }
-        });
-      });
-    });
-    const uniqueFallback = shuffle([...new Set(fallback)]).filter((f) => !distractors.includes(f));
-    distractors = [...distractors, ...uniqueFallback.slice(0, 3 - distractors.length)];
-  }
-
-  return shuffle([question.answer, ...distractors]);
+  return shuffle([correctForm, ...distractors]);
 }
 
 function renderQuestion() {
@@ -242,6 +254,7 @@ function renderQuestion() {
 
   el.pronounBadge.textContent = question.pronounLabel;
   el.verbLabel.textContent = question.verb;
+  el.questionExplain.textContent = `Avec ${question.pronounLabel} + ${question.verb}, j'ecris...`;
 
   el.feedback.hidden = true;
   el.feedbackText.textContent = "";
@@ -265,12 +278,13 @@ function validateAnswer(selectedText, clickedButton) {
 
   state.answered = true;
   const question = state.questions[state.currentIndex];
-  const ok = selectedText === question.answer;
+  const correctForm = extractVerbForm(question.answer);
+  const ok = selectedText === correctForm;
 
   const optionButtons = Array.from(el.optionsWrap.querySelectorAll(".option"));
   optionButtons.forEach((btn) => {
     btn.disabled = true;
-    if (btn.textContent === question.answer) {
+    if (btn.textContent === correctForm) {
       btn.classList.add("is-correct");
     }
     if (btn === clickedButton && !ok) {
@@ -280,16 +294,16 @@ function validateAnswer(selectedText, clickedButton) {
 
   if (ok) {
     state.score += 1;
-    el.feedbackText.textContent = "Super! C'est la bonne reponse!";
+    el.feedbackText.textContent = `Super! Avec ${question.pronounLabel}, ${question.verb} devient ${correctForm}.`;
     triggerRewardAnimation();
   } else {
     state.errors.push({
       verb: question.verb,
       pronoun: question.pronounLabel,
-      expected: question.answer,
+      expected: `${question.pronounLabel} ${correctForm}`,
       selected: selectedText
     });
-    el.feedbackText.textContent = `Presque! La bonne reponse etait: ${question.answer}`;
+    el.feedbackText.textContent = `Presque! Avec ${question.pronounLabel}, il fallait ecrire ${correctForm}.`;
   }
 
   el.feedback.hidden = false;
