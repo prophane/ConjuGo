@@ -4,7 +4,7 @@ const SESSION_SIZE = 10;
 const RECENT_VERB_WINDOW = 2;
 const STORAGE_KEY = "conjugo-preferences-v1";
 const PROGRESS_KEY = "conjugo-progress-v1";
-const APP_VERSION = "v2026.05.24.6";
+const APP_VERSION = "v2026.05.24.7";
 
 const STICKER_SOURCES = [
   "./stickers/brainy-rocket.svg",
@@ -581,19 +581,19 @@ function generateQuestions(selectedCategories, total = SESSION_SIZE) {
     const stepCats = availableCats.length ? availableCats : selectedCategories;
 
     let picked = null;
+    let fallbackPicked = null;
 
     for (const cat of shuffle(stepCats)) {
-      const candidates = candidatesByCategory[cat].filter((c) => !usedPair.has(`${c.verb}|${c.pronounKey}`));
-      if (!candidates.length) {
-        continue;
-      }
+      const uniqueCandidates = candidatesByCategory[cat].filter((c) => !usedPair.has(`${c.verb}|${c.pronounKey}`));
+      const allCandidates = candidatesByCategory[cat];
 
-      const sorted = [...candidates].sort((a, b) => {
+      const sortCandidates = (candidates) => [...candidates].sort((a, b) => {
         const scoreA = pronounUsage[a.pronounKey] + (recentVerbs.includes(a.verb) ? 10 : 0) + Math.random();
         const scoreB = pronounUsage[b.pronounKey] + (recentVerbs.includes(b.verb) ? 10 : 0) + Math.random();
         return scoreA - scoreB;
       });
 
+      const sorted = sortCandidates(uniqueCandidates);
       const best = sorted[0];
       if (best) {
         picked = best;
@@ -602,6 +602,14 @@ function generateQuestions(selectedCategories, total = SESSION_SIZE) {
         }
         break;
       }
+
+      if (!fallbackPicked && allCandidates.length) {
+        fallbackPicked = sortCandidates(allCandidates)[0];
+      }
+    }
+
+    if (!picked) {
+      picked = fallbackPicked;
     }
 
     if (!picked) {
@@ -756,7 +764,7 @@ function isElidedPronoun(question) {
     return false;
   }
 
-  return /^[aeiouyh]/i.test(question.verb);
+  return /^[aeiouyh]/i.test(extractVerbForm(question.answer));
 }
 
 function getPromptPronoun(question) {
