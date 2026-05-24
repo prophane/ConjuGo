@@ -254,6 +254,47 @@ h1 {
   height: 72px;
 }
 
+.collection-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.collect-card {
+  border-radius: 12px;
+  border: 1px solid #c7d2fe;
+  background: #ffffff;
+  min-height: 120px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  padding: 8px;
+  text-align: center;
+}
+
+.collect-card img {
+  width: 64px;
+  height: 64px;
+}
+
+.collect-card.locked {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.collect-title {
+  margin: 6px 0 2px;
+  font-weight: 800;
+}
+
+.collect-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+}
+
 .cta,
 .ghost {
   width: 100%;
@@ -468,6 +509,51 @@ h1 {
 .rewards-box ul {
   margin: 8px 0 0;
   padding-left: 18px;
+}
+
+#rewardCard {
+  margin-top: 10px;
+}
+
+.pack-card {
+  border-radius: 14px;
+  padding: 10px;
+  border: 2px solid #cbd5e1;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.pack-card img {
+  width: 74px;
+  height: 74px;
+}
+
+.pack-title {
+  margin: 0;
+  font-weight: 800;
+}
+
+.pack-meta {
+  margin: 0;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.pack-card.rarity-common {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.pack-card.rarity-rare {
+  background: linear-gradient(135deg, #dbeafe, #ecfeff);
+  border-color: #38bdf8;
+}
+
+.pack-card.rarity-epic {
+  background: linear-gradient(135deg, #fef3c7, #fee2e2);
+  border-color: #f59e0b;
 }
 
 .app-footer {

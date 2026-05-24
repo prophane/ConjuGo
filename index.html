@@ -81,6 +81,11 @@
             <figure class="sticker-card"><img src="./stickers/brainy-slime.svg" alt="Mascotte slime" /></figure>
           </div>
         </section>
+
+        <section class="gallery-panel" aria-labelledby="collectionTitle">
+          <h3 id="collectionTitle">Collection de cartes</h3>
+          <div class="collection-grid" id="collectionGrid" aria-live="polite"></div>
+        </section>
       </section>
 
       <section id="view-session" class="view" aria-labelledby="session-title">
@@ -120,6 +125,7 @@
 
         <div class="rewards-box">
           <p>Pieces gagnees: <strong id="earnedCoins">0</strong></p>
+          <div id="rewardCard"></div>
           <ul id="rewardUnlockedList"></ul>
         </div>
 

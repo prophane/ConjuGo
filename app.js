@@ -4,13 +4,44 @@ const SESSION_SIZE = 10;
 const RECENT_VERB_WINDOW = 2;
 const STORAGE_KEY = "conjugo-preferences-v1";
 const PROGRESS_KEY = "conjugo-progress-v1";
-const APP_VERSION = "v2026.05.24.4";
+const APP_VERSION = "v2026.05.24.5";
 
 const STICKER_SOURCES = [
   "./stickers/brainy-rocket.svg",
   "./stickers/brainy-shark.svg",
   "./stickers/brainy-toast.svg",
   "./stickers/brainy-slime.svg"
+];
+
+const CARD_DEFS = [
+  {
+    id: "rocket_rider",
+    name: "Rocket Rider",
+    rarity: "Rare",
+    image: "./stickers/brainy-rocket.svg",
+    line: "Turbo conjugaison"
+  },
+  {
+    id: "shark_blitz",
+    name: "Shark Blitz",
+    rarity: "Epic",
+    image: "./stickers/brainy-shark.svg",
+    line: "Mord les fautes"
+  },
+  {
+    id: "toast_king",
+    name: "Toast King",
+    rarity: "Common",
+    image: "./stickers/brainy-toast.svg",
+    line: "Chaud devant"
+  },
+  {
+    id: "slime_combo",
+    name: "Slime Combo",
+    rarity: "Common",
+    image: "./stickers/brainy-slime.svg",
+    line: "Combo gluant"
+  }
 ];
 
 const REWARD_DEFS = [
@@ -31,7 +62,9 @@ const state = {
   progress: null,
   sessionReward: {
     coins: 0,
-    unlocked: []
+    unlocked: [],
+    card: null,
+    wasNewCard: false
   }
 };
 
@@ -67,8 +100,10 @@ const el = {
   statAccuracy: document.getElementById("statAccuracy"),
   statCoins: document.getElementById("statCoins"),
   badgeWall: document.getElementById("badgeWall"),
+  collectionGrid: document.getElementById("collectionGrid"),
   earnedCoins: document.getElementById("earnedCoins"),
   rewardUnlockedList: document.getElementById("rewardUnlockedList"),
+  rewardCard: document.getElementById("rewardCard"),
   mascotImage: document.getElementById("mascotImage"),
   mascotText: document.getElementById("mascotText")
 };
@@ -126,7 +161,8 @@ function defaultProgress() {
     currentStreak: 0,
     maxStreak: 0,
     coins: 0,
-    badges: []
+    badges: [],
+    collection: {}
   };
 }
 
@@ -189,6 +225,32 @@ function renderProgressPanel() {
       });
     }
   }
+
+  if (el.collectionGrid) {
+    el.collectionGrid.innerHTML = "";
+    CARD_DEFS.forEach((card) => {
+      const count = Number(state.progress.collection[card.id] || 0);
+      const article = document.createElement("article");
+      article.className = `collect-card ${count ? "unlocked" : "locked"}`;
+
+      const img = document.createElement("img");
+      img.src = card.image;
+      img.alt = count ? `Carte ${card.name}` : "Carte verrouillee";
+
+      const title = document.createElement("p");
+      title.className = "collect-title";
+      title.textContent = count ? card.name : "???";
+
+      const meta = document.createElement("p");
+      meta.className = "collect-meta";
+      meta.textContent = count ? `${card.rarity} · x${count}` : "A debloquer";
+
+      article.appendChild(img);
+      article.appendChild(title);
+      article.appendChild(meta);
+      el.collectionGrid.appendChild(article);
+    });
+  }
 }
 
 function applySessionRewards() {
@@ -212,6 +274,17 @@ function applySessionRewards() {
   const earnedCoins = state.score + (state.score === SESSION_SIZE ? 4 : 0);
   progress.coins += earnedCoins;
 
+  const drawnCard = drawRewardCard(state.score);
+  const previousCount = Number(progress.collection[drawnCard.id] || 0);
+  progress.collection[drawnCard.id] = previousCount + 1;
+  const wasNewCard = previousCount === 0;
+
+  if (drawnCard.rarity === "Epic") {
+    progress.coins += 3;
+  } else if (drawnCard.rarity === "Rare") {
+    progress.coins += 1;
+  }
+
   const unlockedNow = [];
   REWARD_DEFS.forEach((reward) => {
     const already = progress.badges.includes(reward.label);
@@ -222,12 +295,35 @@ function applySessionRewards() {
   });
 
   state.sessionReward = {
-    coins: earnedCoins,
-    unlocked: unlockedNow
+    coins: earnedCoins + (drawnCard.rarity === "Epic" ? 3 : drawnCard.rarity === "Rare" ? 1 : 0),
+    unlocked: unlockedNow,
+    card: drawnCard,
+    wasNewCard
   };
 
   saveProgress();
   renderProgressPanel();
+}
+
+function drawRewardCard(score) {
+  const weighted = [];
+
+  CARD_DEFS.forEach((card) => {
+    let weight = 1;
+    if (card.rarity === "Common") {
+      weight = 6;
+    } else if (card.rarity === "Rare") {
+      weight = score >= 7 ? 4 : 2;
+    } else if (card.rarity === "Epic") {
+      weight = score >= 9 ? 2 : 1;
+    }
+
+    for (let i = 0; i < weight; i += 1) {
+      weighted.push(card);
+    }
+  });
+
+  return weighted[Math.floor(Math.random() * weighted.length)];
 }
 
 function renderSessionRewards() {
@@ -247,6 +343,33 @@ function renderSessionRewards() {
         li.textContent = `Nouveau badge: ${badge}`;
         el.rewardUnlockedList.appendChild(li);
       });
+    }
+  }
+
+  if (el.rewardCard) {
+    el.rewardCard.innerHTML = "";
+    if (state.sessionReward.card) {
+      const card = state.sessionReward.card;
+      const cardEl = document.createElement("article");
+      cardEl.className = `pack-card rarity-${card.rarity.toLowerCase()}`;
+
+      const img = document.createElement("img");
+      img.src = card.image;
+      img.alt = `Carte ${card.name}`;
+
+      const title = document.createElement("p");
+      title.className = "pack-title";
+      title.textContent = card.name;
+
+      const meta = document.createElement("p");
+      meta.className = "pack-meta";
+      const fresh = state.sessionReward.wasNewCard ? "NOUVELLE" : "Doublon";
+      meta.textContent = `${card.rarity} · ${fresh}`;
+
+      cardEl.appendChild(img);
+      cardEl.appendChild(title);
+      cardEl.appendChild(meta);
+      el.rewardCard.appendChild(cardEl);
     }
   }
 }
@@ -600,7 +723,7 @@ function startSession() {
   state.currentIndex = 0;
   state.score = 0;
   state.errors = [];
-  state.sessionReward = { coins: 0, unlocked: [] };
+  state.sessionReward = { coins: 0, unlocked: [], card: null, wasNewCard: false };
 
   showView("session");
   renderQuestion();

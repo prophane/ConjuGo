@@ -43,6 +43,8 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - Suivi local: sessions, precision, meilleur score, pieces
 - Recompenses: badges debloques automatiquement
 - Galerie de stickers originaux style brainy/arcade (assets locaux)
+- Pack de cartes a la fin de chaque session (common/rare/epic)
+- Collection locale avec suivi des doublons
 
 ## 4) Logique de generation (anti-repetition)
 
