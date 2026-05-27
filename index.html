@@ -121,6 +121,12 @@
         <section class="tracker-panel" id="parentAdminPanel" aria-labelledby="parentAdminTitle" hidden>
           <h3 id="parentAdminTitle">Espace parent/admin</h3>
           <p class="hint">Ajoute des profils enfants et suis leur progression globale.</p>
+          <div class="admin-tabs" role="tablist" aria-label="Sections parent">
+            <button id="adminChildrenTab" class="mini-btn is-active" type="button" role="tab" aria-selected="true">Enfants</button>
+            <button id="adminBrainrotTab" class="mini-btn" type="button" role="tab" aria-selected="false">Brainrot</button>
+          </div>
+
+          <div id="adminChildrenPanel" role="tabpanel">
           <form id="addChildForm" class="admin-form">
             <input id="childNameInput" type="text" minlength="2" maxlength="20" placeholder="Nom enfant" required />
             <input
@@ -140,6 +146,12 @@
             <button id="unlockParentAccessBtn" class="ghost" type="button">Afficher acces parent</button>
           </div>
           <div id="childrenOverview" class="children-overview"></div>
+          </div>
+
+          <div id="adminBrainrotPanel" role="tabpanel" hidden>
+            <p class="hint" id="brainrotCountLine">Brainrot disponibles: 0</p>
+            <div id="adminBrainrotGrid" class="brainrot-grid"></div>
+          </div>
         </section>
 
         <section class="gallery-panel" aria-labelledby="collectionTitle">

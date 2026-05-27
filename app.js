@@ -45,6 +45,7 @@ const state = {
   user: null,
   family: null,
   activeChildId: "",
+  adminTab: "children",
   progressStore: null,
   isParentMode: false,
   progress: null,
@@ -71,6 +72,12 @@ const el = {
   leaveParentModeBtn: document.getElementById("leaveParentModeBtn"),
   progressChildLine: document.getElementById("progressChildLine"),
   parentAdminPanel: document.getElementById("parentAdminPanel"),
+  adminChildrenTab: document.getElementById("adminChildrenTab"),
+  adminBrainrotTab: document.getElementById("adminBrainrotTab"),
+  adminChildrenPanel: document.getElementById("adminChildrenPanel"),
+  adminBrainrotPanel: document.getElementById("adminBrainrotPanel"),
+  brainrotCountLine: document.getElementById("brainrotCountLine"),
+  adminBrainrotGrid: document.getElementById("adminBrainrotGrid"),
   addChildForm: document.getElementById("addChildForm"),
   childNameInput: document.getElementById("childNameInput"),
   childPinInput: document.getElementById("childPinInput"),
@@ -539,6 +546,71 @@ function renderChildrenOverview() {
   });
 }
 
+function renderAdminBrainrotCatalog() {
+  if (!el.adminBrainrotGrid) {
+    return;
+  }
+
+  el.adminBrainrotGrid.innerHTML = "";
+
+  const rarityCounts = { Common: 0, Rare: 0, Epic: 0 };
+  CARD_DEFS.forEach((card) => {
+    rarityCounts[card.rarity] = Number(rarityCounts[card.rarity] || 0) + 1;
+
+    const item = document.createElement("article");
+    item.className = "brainrot-item";
+
+    const img = document.createElement("img");
+    img.src = card.image;
+    img.alt = `Brainrot ${card.name}`;
+
+    const title = document.createElement("strong");
+    title.textContent = card.name;
+
+    const rarity = document.createElement("span");
+    rarity.className = `rarity-chip rarity-${card.rarity.toLowerCase()}`;
+    rarity.textContent = card.rarity;
+
+    item.appendChild(img);
+    item.appendChild(title);
+    item.appendChild(rarity);
+    el.adminBrainrotGrid.appendChild(item);
+  });
+
+  if (el.brainrotCountLine) {
+    el.brainrotCountLine.textContent =
+      `Brainrot disponibles: ${CARD_DEFS.length} · Common ${rarityCounts.Common} · Rare ${rarityCounts.Rare} · Epic ${rarityCounts.Epic}`;
+  }
+}
+
+function setAdminTab(tabName) {
+  state.adminTab = tabName === "brainrot" ? "brainrot" : "children";
+
+  if (el.adminChildrenTab) {
+    const active = state.adminTab === "children";
+    el.adminChildrenTab.classList.toggle("is-active", active);
+    el.adminChildrenTab.setAttribute("aria-selected", active ? "true" : "false");
+  }
+
+  if (el.adminBrainrotTab) {
+    const active = state.adminTab === "brainrot";
+    el.adminBrainrotTab.classList.toggle("is-active", active);
+    el.adminBrainrotTab.setAttribute("aria-selected", active ? "true" : "false");
+  }
+
+  if (el.adminChildrenPanel) {
+    el.adminChildrenPanel.hidden = state.adminTab !== "children";
+  }
+
+  if (el.adminBrainrotPanel) {
+    el.adminBrainrotPanel.hidden = state.adminTab !== "brainrot";
+  }
+
+  if (state.adminTab === "brainrot") {
+    renderAdminBrainrotCatalog();
+  }
+}
+
 function renderFamilyUI() {
   if (!state.family) {
     return;
@@ -589,6 +661,8 @@ function renderFamilyUI() {
     el.parentModeBtn.hidden = hideParentAccess && !state.isParentMode;
     el.parentModeBtn.disabled = !state.isParentMode && !isConnectedParent();
   }
+
+  setAdminTab(state.adminTab);
 
   renderChildrenOverview();
 }
@@ -1522,6 +1596,14 @@ function handleUnlockParentAccess() {
   showAdminMessage("Acces parent visible pour la connexion.");
 }
 
+function handleAdminChildrenTab() {
+  setAdminTab("children");
+}
+
+function handleAdminBrainrotTab() {
+  setAdminTab("brainrot");
+}
+
 function handleCategoryToggle(event) {
   const button = event.currentTarget;
   const category = button.dataset.category;
@@ -1555,6 +1637,12 @@ function bindEvents() {
   }
   if (el.unlockParentAccessBtn) {
     el.unlockParentAccessBtn.addEventListener("click", handleUnlockParentAccess);
+  }
+  if (el.adminChildrenTab) {
+    el.adminChildrenTab.addEventListener("click", handleAdminChildrenTab);
+  }
+  if (el.adminBrainrotTab) {
+    el.adminBrainrotTab.addEventListener("click", handleAdminBrainrotTab);
   }
   el.startBtn.addEventListener("click", startSession);
   el.progressBtn.addEventListener("click", navigateToProgress);
