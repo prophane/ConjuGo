@@ -105,8 +105,9 @@ function defaultFamilyState() {
   const childId = "child-1";
   return {
     family: {
-      parent: { name: "Parent Admin", pin: "1234" },
-      children: [{ id: childId, name: "Eleve 1", pin: "1111", createdAt: Date.now() }],
+      parent: { name: "Parent Admin", pin: "1234", accountId: "" },
+      settings: { parentUnlocked: false, hideParentAccess: false },
+      children: [{ id: childId, name: "Enfant", pin: "1111", createdAt: Date.now() }],
       activeChildId: childId
     },
     progressStore: {

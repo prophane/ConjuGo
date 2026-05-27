@@ -268,6 +268,25 @@ h1 {
   color: #475569;
 }
 
+.child-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+}
+
+.mini-btn {
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.82rem;
+  min-height: 30px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
 .home-actions {
   display: grid;
   gap: 10px;

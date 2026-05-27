@@ -84,8 +84,6 @@ const state = {
   }
 };
 
-let deferredInstallPrompt = null;
-
 const el = {
   views: {
     config: document.getElementById("view-config"),
@@ -95,6 +93,7 @@ const el = {
   },
   cards: Array.from(document.querySelectorAll(".cat-card")),
   familyStatusLine: document.getElementById("familyStatusLine"),
+  selectionFollowLine: document.getElementById("selectionFollowLine"),
   activeChildSelect: document.getElementById("activeChildSelect"),
   parentModeBtn: document.getElementById("parentModeBtn"),
   leaveParentModeBtn: document.getElementById("leaveParentModeBtn"),
@@ -103,6 +102,8 @@ const el = {
   addChildForm: document.getElementById("addChildForm"),
   childNameInput: document.getElementById("childNameInput"),
   childPinInput: document.getElementById("childPinInput"),
+  lockParentAccessBtn: document.getElementById("lockParentAccessBtn"),
+  unlockParentAccessBtn: document.getElementById("unlockParentAccessBtn"),
   adminMsg: document.getElementById("adminMsg"),
   childrenOverview: document.getElementById("childrenOverview"),
   selectionSummary: document.getElementById("selectionSummary"),
@@ -110,7 +111,6 @@ const el = {
   progressBtn: document.getElementById("progressBtn"),
   backTrainingBtn: document.getElementById("backTrainingBtn"),
   openProgressFromResultBtn: document.getElementById("openProgressFromResultBtn"),
-  installBtn: document.getElementById("installBtn"),
   counter: document.getElementById("counter"),
   progressBar: document.getElementById("progressBar"),
   pronounBadge: document.getElementById("pronounBadge"),
@@ -170,9 +170,52 @@ function renderUserHeader() {
   }
 
   const firstName = state.user ? toFirstName(state.user.displayName) : "local";
-  const childName = activeChild ? activeChild.name : "-";
+  const childName = getChildDisplayName(activeChild);
   userLineEl.textContent = `Compte: ${firstName} · Profil: ${childName} · Mode: ${modeLabel}`;
   userLineEl.hidden = false;
+}
+
+function getUserAccountId(user) {
+  if (!user) {
+    return "";
+  }
+  return String(user.id || user.email || user.providerSubject || "").trim();
+}
+
+function getChildDisplayName(child) {
+  if (!child) {
+    return "-";
+  }
+  return toFirstName(child.name) || child.name || "-";
+}
+
+function isConnectedParent() {
+  if (!state.family || !state.family.parent) {
+    return false;
+  }
+
+  const parentAccountId = String(state.family.parent.accountId || "").trim();
+  const userAccountId = getUserAccountId(state.user);
+  return Boolean(parentAccountId && userAccountId && parentAccountId === userAccountId);
+}
+
+function ensureParentIdentityFromUser() {
+  if (!state.family || !state.user) {
+    return;
+  }
+
+  state.family.parent = state.family.parent || {};
+  const userAccountId = getUserAccountId(state.user);
+  if (!userAccountId) {
+    return;
+  }
+
+  state.family.parent.accountId = userAccountId;
+  if (state.user.displayName) {
+    state.family.parent.name = state.user.displayName;
+  }
+
+  saveFamily();
 }
 
 async function loadConnectedUser() {
@@ -185,6 +228,7 @@ async function loadConnectedUser() {
     const payload = await response.json();
     if (payload && payload.user) {
       state.user = payload.user;
+      ensureParentIdentityFromUser();
       renderUserHeader();
       renderFamilyUI();
     }
@@ -198,7 +242,12 @@ function defaultFamily() {
   return {
     parent: {
       name: "Parent Admin",
-      pin: "1234"
+      pin: "1234",
+      accountId: ""
+    },
+    settings: {
+      parentUnlocked: false,
+      hideParentAccess: false
     },
     children: [
       {
@@ -238,6 +287,13 @@ function ensureFamilyShape(input) {
 
   const parentName = input.parent && typeof input.parent.name === "string" ? input.parent.name : fallback.parent.name;
   const parentPin = input.parent && cleanPin(input.parent.pin) ? cleanPin(input.parent.pin) : fallback.parent.pin;
+  const parentAccountId =
+    input.parent && typeof input.parent.accountId === "string" ? input.parent.accountId.trim() : fallback.parent.accountId;
+
+  const settings = {
+    parentUnlocked: Boolean(input.settings && input.settings.parentUnlocked),
+    hideParentAccess: Boolean(input.settings && input.settings.hideParentAccess)
+  };
 
   const children = Array.isArray(input.children)
     ? input.children
@@ -259,7 +315,8 @@ function ensureFamilyShape(input) {
     : children[0].id;
 
   return {
-    parent: { name: parentName, pin: parentPin },
+    parent: { name: parentName, pin: parentPin, accountId: parentAccountId },
+    settings,
     children,
     activeChildId
   };
@@ -431,7 +488,7 @@ function renderChildrenOverview() {
     row.className = "child-row";
 
     const title = document.createElement("strong");
-    title.textContent = child.name;
+    title.textContent = getChildDisplayName(child);
 
     const stats = document.createElement("p");
     stats.textContent = `Sessions ${progress.sessionsCount} · Best ${progress.bestScore}/${SESSION_SIZE} · Precision ${accuracy}%`;
@@ -455,7 +512,7 @@ function renderFamilyUI() {
     state.family.children.forEach((child) => {
       const option = document.createElement("option");
       option.value = child.id;
-      option.textContent = child.name;
+      option.textContent = getChildDisplayName(child);
       if (child.id === state.activeChildId) {
         option.selected = true;
       }
@@ -465,19 +522,32 @@ function renderFamilyUI() {
 
   if (el.familyStatusLine) {
     const modeLabel = state.isParentMode ? "parent/admin" : "enfant";
-    el.familyStatusLine.textContent = `Profil actif: ${activeChild ? activeChild.name : "-"} · Mode ${modeLabel}`;
+    el.familyStatusLine.textContent = `Profil actif: ${getChildDisplayName(activeChild)} · Mode ${modeLabel}`;
+  }
+
+  if (el.selectionFollowLine) {
+    const selected = [...state.selected]
+      .map((cat) => (CONJUGO_DATA.categories[cat] ? CONJUGO_DATA.categories[cat].label : cat))
+      .join(", ");
+    el.selectionFollowLine.textContent = `Selection suivie pour ${getChildDisplayName(activeChild)}: ${selected || "aucune categorie"}`;
   }
 
   if (el.progressChildLine) {
-    el.progressChildLine.textContent = `Profil: ${activeChild ? activeChild.name : "-"}`;
+    el.progressChildLine.textContent = `Profil: ${getChildDisplayName(activeChild)}`;
   }
 
+  const hideParentAccess = Boolean(state.family.settings && state.family.settings.hideParentAccess);
   if (el.parentAdminPanel) {
     el.parentAdminPanel.hidden = !state.isParentMode;
   }
 
   if (el.leaveParentModeBtn) {
     el.leaveParentModeBtn.hidden = !state.isParentMode;
+  }
+
+  if (el.parentModeBtn) {
+    el.parentModeBtn.hidden = hideParentAccess && !state.isParentMode;
+    el.parentModeBtn.disabled = !state.isParentMode && !isConnectedParent();
   }
 
   renderChildrenOverview();
@@ -611,7 +681,7 @@ function renderProgressPanel() {
 
   const activeChild = getActiveChild();
   if (el.progressChildLine) {
-    el.progressChildLine.textContent = `Profil: ${activeChild ? activeChild.name : "-"}`;
+    el.progressChildLine.textContent = `Profil: ${getChildDisplayName(activeChild)}`;
   }
   if (el.parentAdminPanel) {
     el.parentAdminPanel.hidden = !state.isParentMode;
@@ -896,6 +966,11 @@ function updateConfigUI() {
     el.selectionSummary.textContent = `Tu as choisi: ${labels.join(", ")}`;
   } else {
     el.selectionSummary.textContent = "Aucune categorie selectionnee.";
+  }
+
+  if (el.selectionFollowLine) {
+    const activeChild = getActiveChild();
+    el.selectionFollowLine.textContent = `Selection suivie pour ${getChildDisplayName(activeChild)}: ${labels.join(", ") || "aucune categorie"}`;
   }
 
   el.startBtn.disabled = labels.length === 0;
@@ -1234,6 +1309,20 @@ function handleParentMode() {
     return;
   }
 
+  if (!isConnectedParent()) {
+    showAdminMessage("Seul le parent connecte peut activer ce mode.");
+    return;
+  }
+
+  if (state.family.settings && state.family.settings.parentUnlocked) {
+    state.isParentMode = true;
+    showAdminMessage("Mode parent/admin actif (session memorisee).");
+    renderFamilyUI();
+    renderProgressPanel();
+    renderUserHeader();
+    return;
+  }
+
   const pin = cleanPin(window.prompt("Code parent/admin:"));
   if (!pin) {
     showAdminMessage("Activation annulee.");
@@ -1245,8 +1334,11 @@ function handleParentMode() {
     return;
   }
 
+  state.family.settings = state.family.settings || {};
+  state.family.settings.parentUnlocked = true;
   state.isParentMode = true;
-  showAdminMessage("Mode parent/admin active.");
+  showAdminMessage("Mode parent/admin active et memorisee sur cet appareil.");
+  saveFamily();
   renderFamilyUI();
   renderProgressPanel();
   renderUserHeader();
@@ -1285,7 +1377,7 @@ function handleChildSwitch(event) {
   }
 
   switchActiveChild(targetChildId);
-  showAdminMessage(`Profil actif: ${targetChild.name}.`);
+  showAdminMessage(`Profil actif: ${getChildDisplayName(targetChild)}.`);
 }
 
 function handleAddChild(event) {
@@ -1305,6 +1397,11 @@ function handleAddChild(event) {
   }
   if (pin.length < 4) {
     showAdminMessage("PIN enfant trop court (4 chiffres min).");
+    return;
+  }
+
+  if (toFirstName(name).toLowerCase() === toFirstName(state.family.parent.name || "").toLowerCase()) {
+    showAdminMessage("Le parent connecte ne peut pas etre cree comme enfant.");
     return;
   }
 
@@ -1331,7 +1428,33 @@ function handleAddChild(event) {
   }
 
   renderFamilyUI();
-  showAdminMessage(`Profil enfant ajoute: ${child.name}.`);
+  showAdminMessage(`Profil enfant ajoute: ${getChildDisplayName(child)}.`);
+}
+
+function handleLockParentAccess() {
+  if (!state.family || !state.isParentMode) {
+    showAdminMessage("Active le mode parent/admin pour modifier ce verrou.");
+    return;
+  }
+
+  state.family.settings = state.family.settings || {};
+  state.family.settings.hideParentAccess = true;
+  saveFamily();
+  renderFamilyUI();
+  showAdminMessage("Acces parent masque cote enfant. Raccourci parent: Alt+Shift+P.");
+}
+
+function handleUnlockParentAccess() {
+  if (!state.family || !state.isParentMode) {
+    showAdminMessage("Active le mode parent/admin pour modifier ce verrou.");
+    return;
+  }
+
+  state.family.settings = state.family.settings || {};
+  state.family.settings.hideParentAccess = false;
+  saveFamily();
+  renderFamilyUI();
+  showAdminMessage("Acces parent visible pour la connexion.");
 }
 
 function handleCategoryToggle(event) {
@@ -1362,6 +1485,12 @@ function bindEvents() {
   if (el.addChildForm) {
     el.addChildForm.addEventListener("submit", handleAddChild);
   }
+  if (el.lockParentAccessBtn) {
+    el.lockParentAccessBtn.addEventListener("click", handleLockParentAccess);
+  }
+  if (el.unlockParentAccessBtn) {
+    el.unlockParentAccessBtn.addEventListener("click", handleUnlockParentAccess);
+  }
   el.startBtn.addEventListener("click", startSession);
   el.progressBtn.addEventListener("click", navigateToProgress);
   el.backTrainingBtn.addEventListener("click", backToTraining);
@@ -1370,29 +1499,17 @@ function bindEvents() {
   el.replayBtn.addEventListener("click", startSession);
   el.backConfigBtn.addEventListener("click", backToConfig);
   document.addEventListener("keydown", (event) => {
+    if (event.altKey && event.shiftKey && event.key.toLowerCase() === "p") {
+      handleParentMode();
+      return;
+    }
     if (event.key === "Enter" && !el.feedback.hidden && el.views.session.classList.contains("active")) {
       nextQuestion();
     }
   });
 }
 
-function bindPwaInstall() {
-  window.addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault();
-    deferredInstallPrompt = event;
-    el.installBtn.hidden = false;
-  });
-
-  el.installBtn.addEventListener("click", async () => {
-    if (!deferredInstallPrompt) {
-      return;
-    }
-    deferredInstallPrompt.prompt();
-    await deferredInstallPrompt.userChoice;
-    deferredInstallPrompt = null;
-    el.installBtn.hidden = true;
-  });
-
+function bindServiceWorker() {
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(() => {
@@ -1415,7 +1532,7 @@ async function init() {
   updateConfigUI();
   renderProgressPanel();
   bindEvents();
-  bindPwaInstall();
+  bindServiceWorker();
   loadConnectedUser();
 }
 

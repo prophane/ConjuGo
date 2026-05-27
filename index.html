@@ -26,7 +26,6 @@
           <p class="user-line" id="userLine" hidden></p>
         </div>
       </div>
-      <button id="installBtn" class="ghost" hidden>Installer</button>
     </header>
 
     <main class="app-shell" id="appShell">
@@ -45,6 +44,7 @@
             <button id="parentModeBtn" class="ghost strong" type="button">Mode parent/admin</button>
             <button id="leaveParentModeBtn" class="ghost" type="button" hidden>Quitter mode parent</button>
           </div>
+          <p id="selectionFollowLine" class="hint">Selection suivie: -</p>
         </section>
 
         <div class="grid-cards" id="categoryGrid" role="group" aria-label="Categories de verbes">
@@ -134,6 +134,10 @@
             <button class="cta small" type="submit">Ajouter profil</button>
           </form>
           <p id="adminMsg" class="hint" aria-live="polite"></p>
+          <div class="family-actions">
+            <button id="lockParentAccessBtn" class="ghost strong" type="button">Verrouiller acces parent cote enfant</button>
+            <button id="unlockParentAccessBtn" class="ghost" type="button">Afficher acces parent</button>
+          </div>
           <div id="childrenOverview" class="children-overview"></div>
         </section>
 
