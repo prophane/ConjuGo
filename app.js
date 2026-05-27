@@ -199,6 +199,16 @@ function isConnectedParent() {
   return Boolean(parentAccountId && userAccountId && parentAccountId === userAccountId);
 }
 
+function syncParentModeFromIdentity() {
+  if (!state.family || !state.family.settings) {
+    state.isParentMode = false;
+    return;
+  }
+
+  const unlocked = Boolean(state.family.settings.parentUnlocked);
+  state.isParentMode = unlocked && isConnectedParent();
+}
+
 function ensureParentIdentityFromUser() {
   if (!state.family || !state.user) {
     return;
@@ -229,8 +239,10 @@ async function loadConnectedUser() {
     if (payload && payload.user) {
       state.user = payload.user;
       ensureParentIdentityFromUser();
+      syncParentModeFromIdentity();
       renderUserHeader();
       renderFamilyUI();
+      renderProgressPanel();
     }
   } catch (_error) {
     // Front remains usable even if backend user API is unavailable.
@@ -1526,6 +1538,7 @@ async function init() {
   }
 
   await loadFamilyStateFromServer();
+  syncParentModeFromIdentity();
   loadPreferences();
   renderFamilyUI();
   renderUserHeader();
