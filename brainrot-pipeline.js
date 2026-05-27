@@ -554,7 +554,7 @@ window.BRAINROT_PIPELINE = (() => {
         id: entry.id,
         name: entry.name,
         rarity: entry.rarity,
-        image: stickerSources[index % stickerSources.length],
+        image: (typeof BRAINROT_VISUALS !== "undefined" && BRAINROT_VISUALS.generate(entry.id)) || stickerSources[index % stickerSources.length],
         family: stylePresets[style].label,
         line: generated.output,
         quality: generated.score.total,

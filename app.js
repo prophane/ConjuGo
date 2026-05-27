@@ -148,6 +148,11 @@ function applyCardVisual(img, card) {
     return;
   }
 
+  if (card.image && card.image.startsWith("data:")) {
+    img.style.filter = "";
+    return;
+  }
+
   img.style.filter = `hue-rotate(${Number(card.hue || 0)}deg) saturate(${Number(card.sat || 1)})`;
 }
 
