@@ -17,6 +17,7 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - styles.css: design system, responsive mobile-first, animations courtes
 - data.js: dataset initial des verbes + pronoms + groupes
 - brainrot-pipeline.js: pipeline de generation brainrot (prompts, presets, scoring, retry)
+- brainrot-visuals.js: moteur SVG procedural (silhouettes, visages, decors par brainrot)
 - app.js: logique de session, progression, mode famille parent/enfants, collection brainrot
 - server.js: serveur Node (fichiers statiques + API /api/me + auto-provisioning utilisateur + API famille)
 - manifest.webmanifest: metadonnees PWA
@@ -46,7 +47,13 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - Collection brainrot curatee (30 stickers premium) avec progression qualitative
 - Stickers affiches uniquement quand debloques (pas de grille grisee)
 - Pack de recompense en fin de session (priorite aux nouveaux stickers)
+- Clic sur une carte brainrot: ouverture en grand dans une modale
+- Bouton "Enregistrer la carte": telechargement direct de l'illustration
 - Page Progression: niveau, xp, badges, collection debloquee
+- Collection brainrot avec rendu visuel procedural:
+  - familles visuelles differentes (pas un template unique recolore)
+  - silhouettes, proportions et expressions distinctes selon la carte
+  - effets de rarete renforces (Common/Rare/Epic)
 - Pipeline brainrot qualite (nouveau):
   - systemPrompt strict (style, contraintes, interdits)
   - presets de style: classic, feral, nuclear
@@ -56,8 +63,10 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
   - garde-fous anti-sorties plates et anti-phrases generiques
 - Gestion pedagogique des contractions: je -> j' devant voyelle/h muet
 - Mode famille parent/enfants:
-  - Profil enfant actif selectionnable
+  - Profil actif selectionnable (Mon profil ou enfant)
+  - Mon profil utilisable meme sans enfant cree
   - Progression stockee par enfant (stats, badges, xp, collection)
+  - Progression dediee pour Mon profil (separee des enfants)
   - Mode parent/admin protege par PIN (par defaut: 1234)
   - Parent lie au compte connecte (SSO), parent != enfant
   - Ajout de profils enfants (nom + PIN)
@@ -118,6 +127,8 @@ Puis ouvrir:
 
 Le pipeline de generation est centralise dans brainrot-pipeline.js.
 
+Le rendu visuel des cartes est centralise dans brainrot-visuals.js.
+
 Composants:
 
 - systemPrompt: regles strictes de sortie
@@ -126,10 +137,11 @@ Composants:
 - scoreBrainrot(output): scoring silencieux (0-100)
 - generateWithQuality(...): regeneration si score trop bas
 - buildBrainrotCatalog(...): creation du catalogue final de 30 brainrots curates
+- BRAINROT_VISUALS.generate(...): generation SVG procedural carte par carte
 
 Critiques qualite appliquees:
 
-- 3 a 6 phrases max
+- 1 a 2 phrases max
 - 2+ images mentales concretes
 - 1+ personnification absurde
 - escalation comique obligatoire
