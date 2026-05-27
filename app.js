@@ -1111,7 +1111,8 @@ function renderFamilyUI() {
   }
 
   if (el.parentModeBtn) {
-    el.parentModeBtn.hidden = hideParentAccess && !state.isParentMode;
+    // Child-side lock hides parent access only for non-parent sessions.
+    el.parentModeBtn.hidden = hideParentAccess && !state.isParentMode && !isConnectedParent();
     el.parentModeBtn.disabled = !state.isParentMode && !isConnectedParent();
   }
 
