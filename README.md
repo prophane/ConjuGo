@@ -16,8 +16,8 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - index.html: structure UI (configuration, session, resultats)
 - styles.css: design system, responsive mobile-first, animations courtes
 - data.js: dataset initial des verbes + pronoms + groupes
-- app.js: logique de session, generation des questions, feedback, PWA install
-- server.js: serveur Node (fichiers statiques + API /api/me + auto-provisioning utilisateur)
+- app.js: logique de session, progression, mode famille parent/enfants, collection brainrot
+- server.js: serveur Node (fichiers statiques + API /api/me + auto-provisioning utilisateur + API famille)
 - manifest.webmanifest: metadonnees PWA
 - sw.js: service worker (cache static)
 - icons/icon-192.svg: icone PWA
@@ -42,17 +42,21 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - Boutons Rejouer et Changer la selection
 - Suivi local: sessions, precision, meilleur score, pieces
 - Recompenses: badges debloques automatiquement
-- Galerie de stickers originaux style brainy/arcade (assets locaux)
-- Pack de cartes a la fin de chaque session (common/rare/epic)
-- Collection locale avec suivi des doublons
-- Page dediee progression: niveau, xp, badges, collection
+- Collection brainrot (500 stickers) avec progression rapide et constante
+- Stickers affiches uniquement quand debloques (pas de grille grisee)
+- Pack de recompense en fin de session (priorite aux nouveaux stickers)
+- Page Progression: niveau, xp, badges, collection debloquee
 - Gestion pedagogique des contractions: je -> j' devant voyelle/h muet
-- Mode famille local (nouveau):
+- Mode famille parent/enfants:
   - Profil enfant actif selectionnable
   - Progression stockee par enfant (stats, badges, xp, collection)
   - Mode parent/admin protege par PIN (par defaut: 1234)
+  - Parent lie au compte connecte (SSO), parent != enfant
   - Ajout de profils enfants (nom + PIN)
-  - Vue parent: recap rapide des stats de tous les enfants
+  - Verrou parent cote enfant (masquage acces parent)
+  - Reconnexion parent memorisee sur l'appareil
+  - Espace admin avec onglets Enfants et Brainrot
+  - Onglet Brainrot: catalogue complet + rarete (Common/Rare/Epic)
 
 ## 4) Logique de generation (anti-repetition)
 
@@ -101,6 +105,20 @@ Puis ouvrir:
 - Deploiement: copier les fichiers statiques tels quels
 - Le reverse proxy gere l'authentification en amont
 - L'app est directement accessible sans ecran login
+
+## 7.b) Persistance famille/progression (serveur)
+
+La source principale de verite est cote serveur (dans le dossier data/ monte en volume Docker).
+
+- Famille + progression: data/family-state.json
+- Utilisateurs SSO: data/users.json
+
+Endpoints utilises:
+
+- GET /api/family-state
+- POST /api/family-state
+
+Un cache local navigateur est conserve en secours pour la resilience, puis resynchronise.
 
 ## 8) Accessibilite et UX
 
@@ -236,6 +254,13 @@ Le serveur accepte aussi des en-tetes de secours frequents (utile si Pangolin ne
 - TRUST_PROXY_SECRET (defaut vide)
 
 Si TRUST_PROXY_SECRET est renseigne, /api/me exige ce header exact pour faire confiance a la requete.
+
+### API famille
+
+En plus de /api/me:
+
+- GET /api/family-state: lecture etat famille/progression
+- POST /api/family-state: ecriture etat famille/progression
 
 ### Persistance
 
