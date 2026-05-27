@@ -473,7 +473,7 @@ function normalizeSelectionId(selectionId) {
     return state.family.children[0].id;
   }
 
-  return "";
+  return SELF_SELECTION_ID;
 }
 
 function getSelectionDisplayName(selectionId = state.activeChildId) {
@@ -553,7 +553,6 @@ async function loadConnectedUser() {
 }
 
 function defaultFamily() {
-  const defaultChildId = "child-1";
   return {
     parent: {
       name: "Parent Admin",
@@ -564,16 +563,20 @@ function defaultFamily() {
       parentUnlocked: false,
       hideParentAccess: false
     },
-    children: [
-      {
-        id: defaultChildId,
-        name: "Enfant",
-        pin: "1111",
-        createdAt: Date.now()
-      }
-    ],
-    activeChildId: defaultChildId
+    children: [],
+    activeChildId: SELF_SELECTION_ID
   };
+}
+
+function isLegacyPlaceholderChild(child) {
+  if (!child || typeof child !== "object") {
+    return false;
+  }
+
+  const childId = String(child.id || "").trim();
+  const childName = String(child.name || "").trim().toLowerCase();
+  const childPin = cleanPin(child.pin);
+  return childId === "child-1" && childName === "enfant" && childPin === "1111";
 }
 
 function makeChildId() {
@@ -610,7 +613,7 @@ function ensureFamilyShape(input) {
     hideParentAccess: Boolean(input.settings && input.settings.hideParentAccess)
   };
 
-  const children = Array.isArray(input.children)
+  let children = Array.isArray(input.children)
     ? input.children
         .filter((child) => child && typeof child.name === "string")
         .map((child, index) => ({
@@ -619,15 +622,20 @@ function ensureFamilyShape(input) {
           pin: cleanPin(child.pin) || "0000",
           createdAt: Number(child.createdAt) || Date.now()
         }))
-    : fallback.children;
+    : [];
 
-  if (!children.length) {
-    children.push(...fallback.children);
+  if (children.length === 1 && isLegacyPlaceholderChild(children[0])) {
+    children = [];
   }
 
-  const activeChildId = children.some((child) => child.id === input.activeChildId)
-    ? input.activeChildId
-    : children[0].id;
+  const requestedSelectionId = String(input.activeChildId || "").trim();
+  const activeChildId = isSelfSelection(requestedSelectionId)
+    ? SELF_SELECTION_ID
+    : children.some((child) => child.id === requestedSelectionId)
+      ? requestedSelectionId
+      : children.length
+        ? children[0].id
+        : SELF_SELECTION_ID;
 
   return {
     parent: { name: parentName, pin: parentPin, accountId: parentAccountId },
