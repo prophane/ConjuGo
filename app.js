@@ -132,40 +132,93 @@ function toFirstName(fullName) {
 }
 
 function buildStickerCatalog(total) {
-  const roots = [
-    "Cosmo", "Turbo", "Pixel", "Neon", "Lune", "Volt", "Bubble", "Giga", "Moka", "Funky", "Nova", "Pogo",
-    "Jazz", "Kawaii", "Plasma", "Dino", "Meme", "Salsa", "Comete", "Noodle", "Zappy", "Kiwi", "Biscuit", "Mistral"
-  ];
-  const sparks = [
-    "Rigolux", "Brillito", "Zigzag", "BoumBoum", "Paillette", "Galaxie", "Banane", "Fripon", "Popsicle", "Bricolo",
-    "Tonnerre", "Craquant", "Lutin", "Cocotte", "Brouhaha", "Plouf", "Soleil", "Marmelade", "Laser", "Comique",
-    "Jongleur", "Mystere", "Farfelu", "ArcEnCiel"
-  ];
-  const lines = [
-    "Brillant et malin", "Rigolo ultra rapide", "Un cerveau en feu d'artifice", "Fait rire tout le dictionnaire",
-    "Champion des idees folles", "Tourbillon de bonne humeur", "Eclair de genialite", "Capitaine des reponses justes"
+  const families = [
+    {
+      key: "chaos",
+      label: "Chaos Pop",
+      roots: ["Boum", "Zig", "Crac", "Wizz", "Paf", "Raaah", "Flip", "Gloop", "Woop", "Tchac"],
+      sparks: ["Banane", "Turbo", "Glitch", "Nouille", "Biscotte", "Confetti", "Panic", "Marmotte", "Meteor", "Paillette"],
+      lines: [
+        "Rit trop fort en conjugaison",
+        "Danse quand tu mets la bonne reponse",
+        "Genere du chaos gentil",
+        "Lance des confettis grammaticaux"
+      ],
+      hueOffset: 0,
+      satBase: 1.1
+    },
+    {
+      key: "cosmic",
+      label: "Cosmic Meme",
+      roots: ["Nova", "Quasar", "Pulsar", "Comete", "Astro", "Orbit", "Lune", "Meteor", "Nebule", "Eclipse"],
+      sparks: ["Rigolo", "Zoom", "Wobble", "Cookie", "Laser", "Jazz", "Bricolo", "Soleil", "Plasma", "Farfelu"],
+      lines: [
+        "Brille meme a minuit",
+        "Pilote des etoiles absurdes",
+        "Hyper cool dans la galaxie des verbes",
+        "Fait des saltos orbitaux"
+      ],
+      hueOffset: 60,
+      satBase: 1.2
+    },
+    {
+      key: "arcade",
+      label: "Arcade Loop",
+      roots: ["Pixel", "Combo", "Turbo", "Joystick", "Checkpoint", "Boss", "Speed", "Coin", "Level", "Dash"],
+      sparks: ["Meme", "Ninja", "Bloop", "Raptor", "Buzzer", "Rocket", "Doodle", "Hyper", "Party", "Splash"],
+      lines: [
+        "Combo x99 de bonne humeur",
+        "Debloque des niveaux imaginaires",
+        "Champion des points stylax",
+        "Respire en mode arcade"
+      ],
+      hueOffset: 140,
+      satBase: 1.15
+    },
+    {
+      key: "spark",
+      label: "Sparkle Club",
+      roots: ["Paillette", "Candy", "Kawaii", "Moka", "Bubble", "Pops", "Rainbow", "Fluffy", "Cream", "Velours"],
+      sparks: ["Comique", "Mystere", "Flash", "Cupcake", "Wizz", "Rumba", "Lutin", "Mistral", "Spritz", "Craquant"],
+      lines: [
+        "Mignon mais tres malin",
+        "Diffuse des idees brillantes",
+        "Fait sourire les dictionnaires",
+        "Vibe douce et super fun"
+      ],
+      hueOffset: 240,
+      satBase: 1.25
+    }
   ];
 
   const combos = [];
-  roots.forEach((root) => {
-    sparks.forEach((spark) => {
-      combos.push(`${root} ${spark}`);
+  families.forEach((family) => {
+    family.roots.forEach((root) => {
+      family.sparks.forEach((spark) => {
+        combos.push({
+          family,
+          name: `${root} ${spark}`
+        });
+      });
     });
   });
 
   const catalog = [];
   for (let index = 0; index < total; index += 1) {
     const tier = index + 1;
+    const combo = combos[index % combos.length];
+    const family = combo.family;
     const rarity = tier % 10 === 0 ? "Epic" : tier % 4 === 0 ? "Rare" : "Common";
 
     catalog.push({
       id: `sticker-${String(tier).padStart(3, "0")}`,
-      name: combos[index],
+      name: `${combo.name} ${String(tier).padStart(3, "0")}`,
       rarity,
       image: STICKER_SOURCES[index % STICKER_SOURCES.length],
-      line: lines[index % lines.length],
-      hue: (index * 29) % 360,
-      sat: 1.05 + ((index % 5) * 0.08)
+      family: family.label,
+      line: family.lines[index % family.lines.length],
+      hue: (family.hueOffset + (index * 31)) % 360,
+      sat: family.satBase + ((index % 4) * 0.05)
     });
   }
 
@@ -629,9 +682,14 @@ function renderAdminBrainrotCatalog() {
     rarity.className = `rarity-chip rarity-${card.rarity.toLowerCase()}`;
     rarity.textContent = card.rarity;
 
+    const family = document.createElement("p");
+    family.className = "collect-meta";
+    family.textContent = card.family || "Brainrot";
+
     item.appendChild(img);
     item.appendChild(title);
     item.appendChild(rarity);
+    item.appendChild(family);
     el.adminBrainrotGrid.appendChild(item);
   });
 
@@ -944,7 +1002,7 @@ function renderProgressPanel() {
 
       const meta = document.createElement("p");
       meta.className = "collect-meta";
-      meta.textContent = `${card.rarity} · x${count}`;
+      meta.textContent = `${card.rarity} · ${card.family || "Brainrot"} · x${count}`;
 
       article.appendChild(img);
       article.appendChild(title);
