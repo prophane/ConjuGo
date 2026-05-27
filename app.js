@@ -1,4 +1,4 @@
-/* global CONJUGO_DATA */
+/* global CONJUGO_DATA, BRAINROT_PIPELINE */
 
 const SESSION_SIZE = 10;
 const RECENT_VERB_WINDOW = 2;
@@ -17,7 +17,9 @@ const STICKER_SOURCES = [
   "./stickers/brainy-slime.svg"
 ];
 
-const CARD_DEFS = buildStickerCatalog(STICKER_CATALOG_SIZE);
+const CARD_DEFS = BRAINROT_PIPELINE
+  ? BRAINROT_PIPELINE.buildBrainrotCatalog(STICKER_CATALOG_SIZE, STICKER_SOURCES)
+  : [];
 
 const REWARD_DEFS = [
   { id: "first_session", label: "Premier pas", check: (p) => p.sessionsCount >= 1 },
@@ -129,100 +131,6 @@ function toFirstName(fullName) {
     return "";
   }
   return fullName.trim().split(/\s+/)[0] || "";
-}
-
-function buildStickerCatalog(total) {
-  const families = [
-    {
-      key: "chaos",
-      label: "Chaos Pop",
-      roots: ["Boum", "Zig", "Crac", "Wizz", "Paf", "Raaah", "Flip", "Gloop", "Woop", "Tchac"],
-      sparks: ["Banane", "Turbo", "Glitch", "Nouille", "Biscotte", "Confetti", "Panic", "Marmotte", "Meteor", "Paillette"],
-      lines: [
-        "Rit trop fort en conjugaison",
-        "Danse quand tu mets la bonne reponse",
-        "Genere du chaos gentil",
-        "Lance des confettis grammaticaux"
-      ],
-      hueOffset: 0,
-      satBase: 1.1
-    },
-    {
-      key: "cosmic",
-      label: "Cosmic Meme",
-      roots: ["Nova", "Quasar", "Pulsar", "Comete", "Astro", "Orbit", "Lune", "Meteor", "Nebule", "Eclipse"],
-      sparks: ["Rigolo", "Zoom", "Wobble", "Cookie", "Laser", "Jazz", "Bricolo", "Soleil", "Plasma", "Farfelu"],
-      lines: [
-        "Brille meme a minuit",
-        "Pilote des etoiles absurdes",
-        "Hyper cool dans la galaxie des verbes",
-        "Fait des saltos orbitaux"
-      ],
-      hueOffset: 60,
-      satBase: 1.2
-    },
-    {
-      key: "arcade",
-      label: "Arcade Loop",
-      roots: ["Pixel", "Combo", "Turbo", "Joystick", "Checkpoint", "Boss", "Speed", "Coin", "Level", "Dash"],
-      sparks: ["Meme", "Ninja", "Bloop", "Raptor", "Buzzer", "Rocket", "Doodle", "Hyper", "Party", "Splash"],
-      lines: [
-        "Combo x99 de bonne humeur",
-        "Debloque des niveaux imaginaires",
-        "Champion des points stylax",
-        "Respire en mode arcade"
-      ],
-      hueOffset: 140,
-      satBase: 1.15
-    },
-    {
-      key: "spark",
-      label: "Sparkle Club",
-      roots: ["Paillette", "Candy", "Kawaii", "Moka", "Bubble", "Pops", "Rainbow", "Fluffy", "Cream", "Velours"],
-      sparks: ["Comique", "Mystere", "Flash", "Cupcake", "Wizz", "Rumba", "Lutin", "Mistral", "Spritz", "Craquant"],
-      lines: [
-        "Mignon mais tres malin",
-        "Diffuse des idees brillantes",
-        "Fait sourire les dictionnaires",
-        "Vibe douce et super fun"
-      ],
-      hueOffset: 240,
-      satBase: 1.25
-    }
-  ];
-
-  const combos = [];
-  families.forEach((family) => {
-    family.roots.forEach((root) => {
-      family.sparks.forEach((spark) => {
-        combos.push({
-          family,
-          name: `${root} ${spark}`
-        });
-      });
-    });
-  });
-
-  const catalog = [];
-  for (let index = 0; index < total; index += 1) {
-    const tier = index + 1;
-    const combo = combos[index % combos.length];
-    const family = combo.family;
-    const rarity = tier % 10 === 0 ? "Epic" : tier % 4 === 0 ? "Rare" : "Common";
-
-    catalog.push({
-      id: `sticker-${String(tier).padStart(3, "0")}`,
-      name: `${combo.name} ${String(tier).padStart(3, "0")}`,
-      rarity,
-      image: STICKER_SOURCES[index % STICKER_SOURCES.length],
-      family: family.label,
-      line: family.lines[index % family.lines.length],
-      hue: (family.hueOffset + (index * 31)) % 360,
-      sat: family.satBase + ((index % 4) * 0.05)
-    });
-  }
-
-  return catalog;
 }
 
 function applyCardVisual(img, card) {

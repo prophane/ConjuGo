@@ -16,6 +16,7 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - index.html: structure UI (configuration, session, resultats)
 - styles.css: design system, responsive mobile-first, animations courtes
 - data.js: dataset initial des verbes + pronoms + groupes
+- brainrot-pipeline.js: pipeline de generation brainrot (prompts, presets, scoring, retry)
 - app.js: logique de session, progression, mode famille parent/enfants, collection brainrot
 - server.js: serveur Node (fichiers statiques + API /api/me + auto-provisioning utilisateur + API famille)
 - manifest.webmanifest: metadonnees PWA
@@ -46,6 +47,13 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - Stickers affiches uniquement quand debloques (pas de grille grisee)
 - Pack de recompense en fin de session (priorite aux nouveaux stickers)
 - Page Progression: niveau, xp, badges, collection debloquee
+- Pipeline brainrot qualite (nouveau):
+  - systemPrompt strict (style, contraintes, interdits)
+  - presets de style: classic, feral, nuclear
+  - generateBrainrot(input, style)
+  - scoreBrainrot(output): absurdite, visualisation, originalite, escalation, vibe internet
+  - regeneration automatique jusqu'au score minimum
+  - garde-fous anti-sorties plates et anti-phrases generiques
 - Gestion pedagogique des contractions: je -> j' devant voyelle/h muet
 - Mode famille parent/enfants:
   - Profil enfant actif selectionnable
@@ -105,6 +113,32 @@ Puis ouvrir:
 - Deploiement: copier les fichiers statiques tels quels
 - Le reverse proxy gere l'authentification en amont
 - L'app est directement accessible sans ecran login
+
+## 7.c) Generation brainrot (technique)
+
+Le pipeline de generation est centralise dans brainrot-pipeline.js.
+
+Composants:
+
+- systemPrompt: regles strictes de sortie
+- stylePresets: classic / feral / nuclear
+- generateBrainrot(input, style): generation de base
+- scoreBrainrot(output): scoring silencieux (0-100)
+- generateWithQuality(...): regeneration si score trop bas
+- buildBrainrotCatalog(...): creation du catalogue final de 500 brainrots
+
+Critiques qualite appliquees:
+
+- 3 a 6 phrases max
+- 2+ images mentales concretes
+- 1+ personnification absurde
+- escalation comique obligatoire
+- derniere phrase plus forte
+- bannissement des formulations plates/explicatives
+
+Exemples:
+
+- voir BRAINROT_EXAMPLES.md (rate vs reussi)
 
 ## 7.b) Persistance famille/progression (serveur)
 
