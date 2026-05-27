@@ -506,7 +506,7 @@ function syncParentModeFromIdentity() {
   }
 
   const unlocked = Boolean(state.family.settings.parentUnlocked);
-  state.isParentMode = unlocked && isConnectedParent();
+  state.isParentMode = state.isParentMode && unlocked && isConnectedParent();
 }
 
 function ensureParentIdentityFromUser() {
@@ -1771,15 +1771,6 @@ function handleParentMode() {
     return;
   }
 
-  if (state.family.settings && state.family.settings.parentUnlocked) {
-    state.isParentMode = true;
-    showAdminMessage("Mode parent/admin actif (session memorisee).");
-    renderFamilyUI();
-    renderProgressPanel();
-    renderUserHeader();
-    return;
-  }
-
   const pin = cleanPin(window.prompt("Code parent/admin:"));
   if (!pin) {
     showAdminMessage("Activation annulee.");
@@ -1794,7 +1785,7 @@ function handleParentMode() {
   state.family.settings = state.family.settings || {};
   state.family.settings.parentUnlocked = true;
   state.isParentMode = true;
-  showAdminMessage("Mode parent/admin active et memorisee sur cet appareil.");
+  showAdminMessage("Mode parent/admin active.");
   saveFamily();
   renderFamilyUI();
   renderProgressPanel();
