@@ -9,6 +9,7 @@ const FAMILY_SERVER_CACHE_KEY = "conjugo-family-server-cache-v1";
 const FAMILY_API_ENDPOINT = "/api/family-state";
 const APP_VERSION = "v2026.05.27.1";
 const STICKER_CATALOG_SIZE = 30;
+const SELF_SELECTION_ID = "__self__";
 
 const STICKER_SOURCES = [
   "./stickers/brainy-rocket.svg",
@@ -331,8 +332,9 @@ function renderUserHeader() {
 
   const firstName = state.user ? toFirstName(state.user.displayName) : "local";
   const accountRole = isConnectedParent() ? "parent" : "enfant";
-  const childName = getChildDisplayName(activeChild);
-  userLineEl.textContent = `Compte: ${firstName} (${accountRole}) · Enfant suivi: ${childName} · Mode: ${modeLabel}`;
+  const profileName = isSelfSelection(state.activeChildId) ? "Mon profil" : getChildDisplayName(activeChild);
+  const trackedLabel = isSelfSelection(state.activeChildId) ? "Profil suivi" : "Enfant suivi";
+  userLineEl.textContent = `Compte: ${firstName} (${accountRole}) · ${trackedLabel}: ${profileName} · Mode: ${modeLabel}`;
   userLineEl.hidden = false;
 }
 
@@ -348,6 +350,71 @@ function getChildDisplayName(child) {
     return "-";
   }
   return toFirstName(child.name) || child.name || "-";
+}
+
+function isSelfSelection(selectionId) {
+  return selectionId === SELF_SELECTION_ID;
+}
+
+function getSelfProgressKey() {
+  const connectedAccountId = getUserAccountId(state.user);
+  const familyParentAccountId =
+    state.family && state.family.parent && typeof state.family.parent.accountId === "string"
+      ? state.family.parent.accountId.trim()
+      : "";
+  const accountId = connectedAccountId || familyParentAccountId || "local";
+  return `self:${accountId}`;
+}
+
+function getProgressKeyForSelection(selectionId) {
+  if (!selectionId) {
+    return "";
+  }
+  return isSelfSelection(selectionId) ? getSelfProgressKey() : selectionId;
+}
+
+function getActiveProgressKey() {
+  return getProgressKeyForSelection(state.activeChildId);
+}
+
+function isKnownChildId(selectionId) {
+  if (!state.family || !selectionId) {
+    return false;
+  }
+  return state.family.children.some((child) => child.id === selectionId);
+}
+
+function normalizeSelectionId(selectionId) {
+  if (isSelfSelection(selectionId)) {
+    return SELF_SELECTION_ID;
+  }
+
+  if (isKnownChildId(selectionId)) {
+    return selectionId;
+  }
+
+  if (state.family && isKnownChildId(state.family.activeChildId)) {
+    return state.family.activeChildId;
+  }
+
+  if (state.family && state.family.children.length) {
+    return state.family.children[0].id;
+  }
+
+  return "";
+}
+
+function getSelectionDisplayName(selectionId = state.activeChildId) {
+  if (isSelfSelection(selectionId)) {
+    return "Mon profil";
+  }
+
+  if (!state.family) {
+    return "-";
+  }
+
+  const child = state.family.children.find((entry) => entry.id === selectionId) || null;
+  return getChildDisplayName(child);
 }
 
 function isConnectedParent() {
@@ -400,6 +467,9 @@ async function loadConnectedUser() {
     if (payload && payload.user) {
       state.user = payload.user;
       ensureParentIdentityFromUser();
+      if (isSelfSelection(state.activeChildId)) {
+        loadProgress();
+      }
       syncParentModeFromIdentity();
       renderUserHeader();
       renderFamilyUI();
@@ -500,7 +570,9 @@ function saveFamily() {
     return;
   }
 
-  state.family.activeChildId = state.activeChildId;
+  if (isKnownChildId(state.activeChildId)) {
+    state.family.activeChildId = state.activeChildId;
+  }
   localStorage.setItem(FAMILY_KEY, JSON.stringify(state.family));
   scheduleServerPersist();
 }
@@ -510,16 +582,16 @@ function loadFamily() {
     const raw = localStorage.getItem(FAMILY_KEY);
     if (!raw) {
       state.family = defaultFamily();
-      state.activeChildId = state.family.activeChildId;
+      state.activeChildId = normalizeSelectionId(state.family.activeChildId);
       saveFamily();
       return;
     }
 
     state.family = ensureFamilyShape(JSON.parse(raw));
-    state.activeChildId = state.family.activeChildId;
+    state.activeChildId = normalizeSelectionId(state.family.activeChildId);
   } catch (_error) {
     state.family = defaultFamily();
-    state.activeChildId = state.family.activeChildId;
+    state.activeChildId = normalizeSelectionId(state.family.activeChildId);
     saveFamily();
   }
 }
@@ -595,14 +667,18 @@ async function loadFamilyStateFromServer() {
       const payload = await response.json();
       if (payload && payload.family && payload.progressStore) {
         state.family = ensureFamilyShape(payload.family);
-        state.activeChildId = state.family.activeChildId;
+        const persistedSelection = payload.progressStore && payload.progressStore.activeChildId
+          ? payload.progressStore.activeChildId
+          : state.family.activeChildId;
+        state.activeChildId = normalizeSelectionId(persistedSelection);
         state.progressStore = normalizeProgressStore(payload.progressStore, state.activeChildId);
 
-        if (state.activeChildId && !state.progressStore.byChild[state.activeChildId]) {
-          state.progressStore.byChild[state.activeChildId] = defaultProgress();
+        const activeProgressKey = getActiveProgressKey();
+        if (activeProgressKey && !state.progressStore.byChild[activeProgressKey]) {
+          state.progressStore.byChild[activeProgressKey] = defaultProgress();
         }
 
-        state.progress = getProgressSnapshotForChild(state.activeChildId);
+        state.progress = getProgressSnapshotForChild(activeProgressKey);
         localStorage.setItem(FAMILY_KEY, JSON.stringify(state.family));
         localStorage.setItem(PROGRESS_KEY, JSON.stringify(state.progressStore));
         cacheFamilyPayloadLocally();
@@ -619,12 +695,16 @@ async function loadFamilyStateFromServer() {
       const payload = JSON.parse(cached);
       if (payload && payload.family && payload.progressStore) {
         state.family = ensureFamilyShape(payload.family);
-        state.activeChildId = state.family.activeChildId;
+        const persistedSelection = payload.progressStore && payload.progressStore.activeChildId
+          ? payload.progressStore.activeChildId
+          : state.family.activeChildId;
+        state.activeChildId = normalizeSelectionId(persistedSelection);
         state.progressStore = normalizeProgressStore(payload.progressStore, state.activeChildId);
-        if (state.activeChildId && !state.progressStore.byChild[state.activeChildId]) {
-          state.progressStore.byChild[state.activeChildId] = defaultProgress();
+        const activeProgressKey = getActiveProgressKey();
+        if (activeProgressKey && !state.progressStore.byChild[activeProgressKey]) {
+          state.progressStore.byChild[activeProgressKey] = defaultProgress();
         }
-        state.progress = getProgressSnapshotForChild(state.activeChildId);
+        state.progress = getProgressSnapshotForChild(activeProgressKey);
         return;
       }
     }
@@ -753,6 +833,14 @@ function renderFamilyUI() {
   if (el.activeChildSelect) {
     el.activeChildSelect.innerHTML = "";
 
+    const selfOption = document.createElement("option");
+    selfOption.value = SELF_SELECTION_ID;
+    selfOption.textContent = "Mon profil";
+    if (isSelfSelection(state.activeChildId)) {
+      selfOption.selected = true;
+    }
+    el.activeChildSelect.appendChild(selfOption);
+
     state.family.children.forEach((child) => {
       const option = document.createElement("option");
       option.value = child.id;
@@ -766,18 +854,19 @@ function renderFamilyUI() {
 
   if (el.familyStatusLine) {
     const modeLabel = state.isParentMode ? "parent/admin" : "enfant";
-    el.familyStatusLine.textContent = `Enfant suivi: ${getChildDisplayName(activeChild)} · Mode ${modeLabel}`;
+    const trackedLabel = isSelfSelection(state.activeChildId) ? "Profil suivi" : "Enfant suivi";
+    el.familyStatusLine.textContent = `${trackedLabel}: ${getSelectionDisplayName()} · Mode ${modeLabel}`;
   }
 
   if (el.selectionFollowLine) {
     const selected = [...state.selected]
       .map((cat) => (CONJUGO_DATA.categories[cat] ? CONJUGO_DATA.categories[cat].label : cat))
       .join(", ");
-    el.selectionFollowLine.textContent = `Selection suivie pour ${getChildDisplayName(activeChild)}: ${selected || "aucune categorie"}`;
+    el.selectionFollowLine.textContent = `Selection suivie pour ${getSelectionDisplayName()}: ${selected || "aucune categorie"}`;
   }
 
   if (el.progressChildLine) {
-    el.progressChildLine.textContent = `Profil: ${getChildDisplayName(activeChild)}`;
+    el.progressChildLine.textContent = `Profil: ${getSelectionDisplayName()}`;
   }
 
   const hideParentAccess = Boolean(state.family.settings && state.family.settings.hideParentAccess);
@@ -804,13 +893,14 @@ function switchActiveChild(nextChildId) {
     return;
   }
 
-  const child = state.family.children.find((entry) => entry.id === nextChildId);
-  if (!child) {
+  if (!isSelfSelection(nextChildId) && !isKnownChildId(nextChildId)) {
     return;
   }
 
-  state.activeChildId = child.id;
-  state.family.activeChildId = child.id;
+  state.activeChildId = isSelfSelection(nextChildId) ? SELF_SELECTION_ID : nextChildId;
+  if (isKnownChildId(nextChildId)) {
+    state.family.activeChildId = nextChildId;
+  }
   loadProgress();
   renderFamilyUI();
   renderProgressPanel();
@@ -848,17 +938,20 @@ function getProgressLevel(progress) {
 }
 
 function loadProgress() {
-  const activeChildId = state.activeChildId || (state.family && state.family.activeChildId) || "";
+  const fallbackSelection = state.activeChildId || (state.family && state.family.activeChildId) || "";
+  const activeSelectionId = normalizeSelectionId(fallbackSelection);
+  state.activeChildId = activeSelectionId;
 
   try {
     const raw = localStorage.getItem(PROGRESS_KEY);
     if (!raw) {
+      const activeProgressKey = getActiveProgressKey();
       state.progressStore = {
         schema: 2,
-        activeChildId,
-        byChild: activeChildId ? { [activeChildId]: defaultProgress() } : {}
+        activeChildId: activeSelectionId,
+        byChild: activeProgressKey ? { [activeProgressKey]: defaultProgress() } : {}
       };
-      state.progress = getProgressSnapshotForChild(activeChildId);
+      state.progress = getProgressSnapshotForChild(activeProgressKey);
       saveProgress();
       return;
     }
@@ -866,34 +959,39 @@ function loadProgress() {
     const parsed = JSON.parse(raw);
 
     if (parsed && typeof parsed === "object" && parsed.schema === 2 && parsed.byChild) {
+      const storedSelection = normalizeSelectionId(parsed.activeChildId || activeSelectionId);
+      state.activeChildId = storedSelection;
       state.progressStore = {
         schema: 2,
-        activeChildId,
+        activeChildId: storedSelection,
         byChild: { ...parsed.byChild }
       };
     } else {
       // Legacy migration: old payload stored one single progress object.
       const legacyProgress = { ...defaultProgress(), ...(parsed || {}) };
+      const activeProgressKey = getActiveProgressKey();
       state.progressStore = {
         schema: 2,
-        activeChildId,
-        byChild: activeChildId ? { [activeChildId]: legacyProgress } : {}
+        activeChildId: activeSelectionId,
+        byChild: activeProgressKey ? { [activeProgressKey]: legacyProgress } : {}
       };
     }
 
-    if (activeChildId && !state.progressStore.byChild[activeChildId]) {
-      state.progressStore.byChild[activeChildId] = defaultProgress();
+    const activeProgressKey = getActiveProgressKey();
+    if (activeProgressKey && !state.progressStore.byChild[activeProgressKey]) {
+      state.progressStore.byChild[activeProgressKey] = defaultProgress();
     }
 
-    state.progress = getProgressSnapshotForChild(activeChildId);
+    state.progress = getProgressSnapshotForChild(activeProgressKey);
     saveProgress();
   } catch (_error) {
+    const activeProgressKey = getActiveProgressKey();
     state.progressStore = {
       schema: 2,
-      activeChildId,
-      byChild: activeChildId ? { [activeChildId]: defaultProgress() } : {}
+      activeChildId: activeSelectionId,
+      byChild: activeProgressKey ? { [activeProgressKey]: defaultProgress() } : {}
     };
-    state.progress = getProgressSnapshotForChild(activeChildId);
+    state.progress = getProgressSnapshotForChild(activeProgressKey);
     saveProgress();
   }
 }
@@ -903,15 +1001,17 @@ function saveProgress() {
     return;
   }
 
-  const activeChildId = state.activeChildId;
-  if (!activeChildId) {
+  const activeSelectionId = normalizeSelectionId(state.activeChildId);
+  state.activeChildId = activeSelectionId;
+  const activeProgressKey = getActiveProgressKey();
+  if (!activeProgressKey) {
     return;
   }
 
   state.progressStore.schema = 2;
-  state.progressStore.activeChildId = activeChildId;
+  state.progressStore.activeChildId = activeSelectionId;
   state.progressStore.byChild = state.progressStore.byChild || {};
-  state.progressStore.byChild[activeChildId] = {
+  state.progressStore.byChild[activeProgressKey] = {
     ...defaultProgress(),
     ...(state.progress || {})
   };
@@ -927,7 +1027,7 @@ function renderProgressPanel() {
 
   const activeChild = getActiveChild();
   if (el.progressChildLine) {
-    el.progressChildLine.textContent = `Profil: ${getChildDisplayName(activeChild)}`;
+    el.progressChildLine.textContent = `Profil: ${isSelfSelection(state.activeChildId) ? "Mon profil" : getChildDisplayName(activeChild)}`;
   }
   if (el.parentAdminPanel) {
     el.parentAdminPanel.hidden = !state.isParentMode;
@@ -1247,8 +1347,7 @@ function updateConfigUI() {
   }
 
   if (el.selectionFollowLine) {
-    const activeChild = getActiveChild();
-    el.selectionFollowLine.textContent = `Selection suivie pour ${getChildDisplayName(activeChild)}: ${labels.join(", ") || "aucune categorie"}`;
+    el.selectionFollowLine.textContent = `Selection suivie pour ${getSelectionDisplayName()}: ${labels.join(", ") || "aucune categorie"}`;
   }
 
   el.startBtn.disabled = labels.length === 0;
@@ -1640,6 +1739,12 @@ function handleChildSwitch(event) {
     return;
   }
 
+  if (isSelfSelection(targetChildId)) {
+    switchActiveChild(SELF_SELECTION_ID);
+    showAdminMessage("Profil actif: Mon profil.");
+    return;
+  }
+
   const targetChild = state.family.children.find((child) => child.id === targetChildId);
   if (!targetChild) {
     return;
@@ -1837,6 +1942,8 @@ async function init() {
   }
 
   await loadFamilyStateFromServer();
+  state.activeChildId = normalizeSelectionId(state.activeChildId || (state.family && state.family.activeChildId) || "");
+  loadProgress();
   syncParentModeFromIdentity();
   loadPreferences();
   renderFamilyUI();
