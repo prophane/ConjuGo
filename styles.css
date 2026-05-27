@@ -868,7 +868,7 @@ h1 {
 
 .brainrot-modal-card {
   position: relative;
-  width: min(430px, 92vw);
+  width: min(560px, 94vw);
   background: #ffffff;
   border: 2px solid #c7d2fe;
   border-radius: 18px;
@@ -891,14 +891,14 @@ h1 {
   flex: 1;
 }
 
+#brainrotModalStage {
+  width: min(420px, 84vw);
+  min-height: min(420px, 84vw);
+}
+
 #brainrotModalMeta {
   font-weight: 800;
   color: #1e3a8a;
-}
-
-.brainrot-modal-card img {
-  width: 124px;
-  height: 124px;
 }
 
 #brainrotModalLine {
