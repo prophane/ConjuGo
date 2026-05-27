@@ -132,22 +132,52 @@ function toFirstName(fullName) {
 }
 
 function buildStickerCatalog(total) {
-  const themes = ["Rocket", "Shark", "Toast", "Slime"];
+  const roots = [
+    "Cosmo", "Turbo", "Pixel", "Neon", "Lune", "Volt", "Bubble", "Giga", "Moka", "Funky", "Nova", "Pogo",
+    "Jazz", "Kawaii", "Plasma", "Dino", "Meme", "Salsa", "Comete", "Noodle", "Zappy", "Kiwi", "Biscuit", "Mistral"
+  ];
+  const sparks = [
+    "Rigolux", "Brillito", "Zigzag", "BoumBoum", "Paillette", "Galaxie", "Banane", "Fripon", "Popsicle", "Bricolo",
+    "Tonnerre", "Craquant", "Lutin", "Cocotte", "Brouhaha", "Plouf", "Soleil", "Marmelade", "Laser", "Comique",
+    "Jongleur", "Mystere", "Farfelu", "ArcEnCiel"
+  ];
+  const lines = [
+    "Brillant et malin", "Rigolo ultra rapide", "Un cerveau en feu d'artifice", "Fait rire tout le dictionnaire",
+    "Champion des idees folles", "Tourbillon de bonne humeur", "Eclair de genialite", "Capitaine des reponses justes"
+  ];
 
-  return Array.from({ length: total }, (_value, index) => {
+  const combos = [];
+  roots.forEach((root) => {
+    sparks.forEach((spark) => {
+      combos.push(`${root} ${spark}`);
+    });
+  });
+
+  const catalog = [];
+  for (let index = 0; index < total; index += 1) {
     const tier = index + 1;
-    const image = STICKER_SOURCES[index % STICKER_SOURCES.length];
-    const theme = themes[index % themes.length];
     const rarity = tier % 10 === 0 ? "Epic" : tier % 4 === 0 ? "Rare" : "Common";
 
-    return {
+    catalog.push({
       id: `sticker-${String(tier).padStart(3, "0")}`,
-      name: `${theme} ${String(tier).padStart(3, "0")}`,
+      name: combos[index],
       rarity,
-      image,
-      line: `Serie ${tier}`
-    };
-  });
+      image: STICKER_SOURCES[index % STICKER_SOURCES.length],
+      line: lines[index % lines.length],
+      hue: (index * 29) % 360,
+      sat: 1.05 + ((index % 5) * 0.08)
+    });
+  }
+
+  return catalog;
+}
+
+function applyCardVisual(img, card) {
+  if (!img || !card) {
+    return;
+  }
+
+  img.style.filter = `hue-rotate(${Number(card.hue || 0)}deg) saturate(${Number(card.sat || 1)})`;
 }
 
 function getUnlockedCount(progress) {
@@ -183,6 +213,33 @@ function unlockCardsForProgress(progress) {
   });
 
   return unlockedNow;
+}
+
+function unlockSingleNewCard(score, progress) {
+  const lockedCards = CARD_DEFS.filter((card) => Number(progress.collection[card.id] || 0) === 0);
+  if (!lockedCards.length) {
+    return null;
+  }
+
+  const weighted = [];
+  lockedCards.forEach((card) => {
+    let weight = 1;
+    if (card.rarity === "Common") {
+      weight = score >= 8 ? 2 : 5;
+    } else if (card.rarity === "Rare") {
+      weight = score >= 7 ? 4 : 2;
+    } else if (card.rarity === "Epic") {
+      weight = score >= 9 ? 3 : 1;
+    }
+
+    for (let i = 0; i < weight; i += 1) {
+      weighted.push(card);
+    }
+  });
+
+  const picked = weighted[Math.floor(Math.random() * weighted.length)];
+  progress.collection[picked.id] = 1;
+  return picked;
 }
 
 function renderUserHeader() {
@@ -563,6 +620,7 @@ function renderAdminBrainrotCatalog() {
     const img = document.createElement("img");
     img.src = card.image;
     img.alt = `Brainrot ${card.name}`;
+    applyCardVisual(img, card);
 
     const title = document.createElement("strong");
     title.textContent = card.name;
@@ -878,6 +936,7 @@ function renderProgressPanel() {
       const img = document.createElement("img");
       img.src = card.image;
       img.alt = `Sticker ${card.name}`;
+      applyCardVisual(img, card);
 
       const title = document.createElement("p");
       title.className = "collect-title";
@@ -919,12 +978,17 @@ function applySessionRewards() {
   progress.xp += earnedXp;
 
   const unlockedCards = unlockCardsForProgress(progress);
-  const drawnCard = unlockedCards.length ? unlockedCards[unlockedCards.length - 1] : drawRewardCard(state.score, progress);
+  let drawnCard = unlockedCards.length ? unlockedCards[unlockedCards.length - 1] : null;
   let wasNewCard = false;
 
-  if (unlockedCards.length) {
+  if (!drawnCard) {
+    drawnCard = unlockSingleNewCard(state.score, progress);
+  }
+
+  if (drawnCard) {
     wasNewCard = true;
   } else {
+    drawnCard = drawRewardCard(state.score, progress);
     const previousCount = Number(progress.collection[drawnCard.id] || 0);
     progress.collection[drawnCard.id] = previousCount + 1;
     wasNewCard = previousCount === 0;
@@ -1016,6 +1080,7 @@ function renderSessionRewards() {
       const img = document.createElement("img");
       img.src = card.image;
       img.alt = `Carte ${card.name}`;
+      applyCardVisual(img, card);
 
       const title = document.createElement("p");
       title.className = "pack-title";
