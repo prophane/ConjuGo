@@ -506,7 +506,8 @@ function syncParentModeFromIdentity() {
   }
 
   const unlocked = Boolean(state.family.settings.parentUnlocked);
-  state.isParentMode = state.isParentMode && unlocked && isConnectedParent();
+  const hasPinValidation = Number(state.family.settings.parentPinValidatedAt || 0) > 0;
+  state.isParentMode = unlocked && hasPinValidation && isConnectedParent();
 }
 
 function ensureParentIdentityFromUser() {
@@ -561,6 +562,7 @@ function defaultFamily() {
     },
     settings: {
       parentUnlocked: false,
+      parentPinValidatedAt: 0,
       hideParentAccess: false
     },
     children: [],
@@ -610,6 +612,7 @@ function ensureFamilyShape(input) {
 
   const settings = {
     parentUnlocked: Boolean(input.settings && input.settings.parentUnlocked),
+    parentPinValidatedAt: Number(input.settings && input.settings.parentPinValidatedAt) || 0,
     hideParentAccess: Boolean(input.settings && input.settings.hideParentAccess)
   };
 
@@ -1771,6 +1774,16 @@ function handleParentMode() {
     return;
   }
 
+  const hasPinValidation = Number(state.family.settings && state.family.settings.parentPinValidatedAt) > 0;
+  if (state.family.settings && state.family.settings.parentUnlocked && hasPinValidation) {
+    state.isParentMode = true;
+    showAdminMessage("Mode parent/admin actif (code deja valide sur cet appareil).");
+    renderFamilyUI();
+    renderProgressPanel();
+    renderUserHeader();
+    return;
+  }
+
   const pin = cleanPin(window.prompt("Code parent/admin:"));
   if (!pin) {
     showAdminMessage("Activation annulee.");
@@ -1784,8 +1797,9 @@ function handleParentMode() {
 
   state.family.settings = state.family.settings || {};
   state.family.settings.parentUnlocked = true;
+  state.family.settings.parentPinValidatedAt = Date.now();
   state.isParentMode = true;
-  showAdminMessage("Mode parent/admin active.");
+  showAdminMessage("Mode parent/admin active (code valide).");
   saveFamily();
   renderFamilyUI();
   renderProgressPanel();
