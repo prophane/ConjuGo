@@ -7,6 +7,7 @@ const PROGRESS_KEY = "conjugo-progress-v1";
 const FAMILY_KEY = "conjugo-family-v1";
 const FAMILY_SERVER_CACHE_KEY = "conjugo-family-server-cache-v1";
 const FAMILY_API_ENDPOINT = "/api/family-state";
+const USERS_API_ENDPOINT = "/api/users";
 const APP_VERSION = "v2026.05.27.1";
 const STICKER_CATALOG_SIZE = 30;
 const SELF_SELECTION_ID = "__self__";
@@ -96,6 +97,7 @@ const el = {
   childPinInput: document.getElementById("childPinInput"),
   lockParentAccessBtn: document.getElementById("lockParentAccessBtn"),
   unlockParentAccessBtn: document.getElementById("unlockParentAccessBtn"),
+  accountUsersList: document.getElementById("accountUsersList"),
   adminMsg: document.getElementById("adminMsg"),
   childrenOverview: document.getElementById("childrenOverview"),
   selectionSummary: document.getElementById("selectionSummary"),
@@ -414,7 +416,15 @@ function getUserAccountId(user) {
   if (!user) {
     return "";
   }
+
   return String(user.id || user.email || user.providerSubject || "").trim();
+}
+
+function getAccountIdFromUserRecord(userRecord) {
+  if (!userRecord || typeof userRecord !== "object") {
+    return "";
+  }
+  return String(userRecord.providerSubject || userRecord.email || userRecord.id || "").trim();
 }
 
 function getChildDisplayName(child) {
@@ -487,6 +497,144 @@ function getSelectionDisplayName(selectionId = state.activeChildId) {
 
   const child = state.family.children.find((entry) => entry.id === selectionId) || null;
   return getChildDisplayName(child);
+}
+
+async function fetchKnownUsers() {
+  try {
+    const response = await fetch(USERS_API_ENDPOINT, { cache: "no-store" });
+    if (!response.ok) {
+      return [];
+    }
+
+    const payload = await response.json();
+    return Array.isArray(payload && payload.users) ? payload.users : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+async function renderAccountUsersList() {
+  if (!el.accountUsersList || !state.family) {
+    return;
+  }
+
+  el.accountUsersList.innerHTML = "";
+
+  const users = await fetchKnownUsers();
+  if (!users.length) {
+    const empty = document.createElement("p");
+    empty.className = "hint";
+    empty.textContent = "Aucun utilisateur detecte pour le moment.";
+    el.accountUsersList.appendChild(empty);
+    return;
+  }
+
+  const parentAccountId = String(state.family.parent && state.family.parent.accountId ? state.family.parent.accountId : "").trim();
+
+  users.forEach((userRecord) => {
+    const accountId = getAccountIdFromUserRecord(userRecord);
+    const linkedChild = state.family.children.find((child) => String(child.accountId || "").trim() === accountId) || null;
+    const isParentAccount = Boolean(parentAccountId && accountId && parentAccountId === accountId);
+
+    const row = document.createElement("article");
+    row.className = "account-user-row";
+
+    const identity = document.createElement("div");
+    identity.className = "account-user-identity";
+
+    const title = document.createElement("strong");
+    title.textContent = toFirstName(userRecord.displayName) || userRecord.displayName || userRecord.email || "Compte";
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "hint";
+    subtitle.textContent = userRecord.email || userRecord.providerSubject || userRecord.id || "identite inconnue";
+
+    identity.appendChild(title);
+    identity.appendChild(subtitle);
+
+    const actions = document.createElement("div");
+    actions.className = "account-user-actions";
+
+    const badge = document.createElement("span");
+    badge.className = "badge-chip";
+
+    if (isParentAccount) {
+      badge.textContent = "Parent";
+      actions.appendChild(badge);
+    } else if (linkedChild) {
+      badge.textContent = `Enfant: ${getChildDisplayName(linkedChild)}`;
+      actions.appendChild(badge);
+    } else {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "mini-btn";
+      button.textContent = "Definir enfant";
+      button.dataset.accountId = accountId;
+      button.dataset.accountName = userRecord.displayName || "";
+      button.dataset.accountEmail = userRecord.email || "";
+      actions.appendChild(button);
+    }
+
+    row.appendChild(identity);
+    row.appendChild(actions);
+    el.accountUsersList.appendChild(row);
+  });
+}
+
+function handleAccountUsersClick(event) {
+  if (!state.family || !state.isParentMode) {
+    return;
+  }
+
+  const button = event.target.closest("button[data-account-id]");
+  if (!button) {
+    return;
+  }
+
+  const accountId = String(button.dataset.accountId || "").trim();
+  if (!accountId) {
+    return;
+  }
+
+  if (String(state.family.parent && state.family.parent.accountId ? state.family.parent.accountId : "").trim() === accountId) {
+    showAdminMessage("Le compte parent ne peut pas etre marque comme enfant.");
+    return;
+  }
+
+  if (state.family.children.some((child) => String(child.accountId || "").trim() === accountId)) {
+    showAdminMessage("Ce compte est deja lie a un profil enfant.");
+    return;
+  }
+
+  const suggestedName = String(button.dataset.accountName || button.dataset.accountEmail || "Enfant").trim();
+  const enteredName = String(window.prompt("Nom du profil enfant:", suggestedName) || "").trim();
+  if (enteredName.length < 2) {
+    showAdminMessage("Nom enfant trop court.");
+    return;
+  }
+
+  const pin = cleanPin(window.prompt(`PIN de ${enteredName} (4 chiffres min):`));
+  if (pin.length < 4) {
+    showAdminMessage("PIN enfant trop court (4 chiffres min).");
+    return;
+  }
+
+  const child = {
+    id: makeChildId(),
+    name: enteredName,
+    pin,
+    accountId,
+    createdAt: Date.now()
+  };
+
+  state.family.children.push(child);
+  state.progressStore = state.progressStore || { schema: 2, activeChildId: state.activeChildId, byChild: {} };
+  state.progressStore.byChild[child.id] = defaultProgress();
+  saveFamily();
+  saveProgress();
+  renderFamilyUI();
+  renderProgressPanel();
+  showAdminMessage(`Compte lie comme enfant: ${getChildDisplayName(child)}.`);
 }
 
 function isConnectedParent() {
@@ -623,6 +771,7 @@ function ensureFamilyShape(input) {
           id: child.id || `child-${index + 1}`,
           name: child.name.trim() || `Enfant ${index + 1}`,
           pin: cleanPin(child.pin) || "0000",
+          accountId: String(child.accountId || "").trim(),
           createdAt: Number(child.createdAt) || Date.now()
         }))
     : [];
@@ -968,6 +1117,7 @@ function renderFamilyUI() {
 
   setAdminTab(state.adminTab);
 
+  renderAccountUsersList();
   renderChildrenOverview();
 }
 
@@ -1966,6 +2116,9 @@ function bindEvents() {
   }
   if (el.unlockParentAccessBtn) {
     el.unlockParentAccessBtn.addEventListener("click", handleUnlockParentAccess);
+  }
+  if (el.accountUsersList) {
+    el.accountUsersList.addEventListener("click", handleAccountUsersClick);
   }
   if (el.adminChildrenTab) {
     el.adminChildrenTab.addEventListener("click", handleAdminChildrenTab);

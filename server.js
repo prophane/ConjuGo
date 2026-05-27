@@ -238,6 +238,21 @@ function upsertUserFromHeaders(request) {
   };
 }
 
+function listKnownUsers() {
+  const store = safeReadJson(USER_DB_FILE);
+  const users = Array.isArray(store.users) ? store.users : [];
+  return users
+    .map((entry) => ({
+      id: entry.id || "",
+      email: entry.email || "",
+      providerSubject: entry.providerSubject || "",
+      displayName: entry.displayName || "",
+      lastSeenAt: entry.lastSeenAt || "",
+      createdAt: entry.createdAt || ""
+    }))
+    .sort((a, b) => String(b.lastSeenAt || "").localeCompare(String(a.lastSeenAt || "")));
+}
+
 function pickRelevantHeaders(request) {
   const allowPattern = /(pangolin|auth|user|email|name|forwarded|remote|principal)/i;
   const result = {};
@@ -348,6 +363,16 @@ const server = http.createServer((request, response) => {
     }
 
     sendJson(response, 200, { user: result.user, identitySource: result.identitySource });
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/users") {
+    if (!ensureTrustedProxy(request)) {
+      sendJson(response, 403, { error: "forbidden" });
+      return;
+    }
+
+    sendJson(response, 200, { users: listKnownUsers() });
     return;
   }
 
