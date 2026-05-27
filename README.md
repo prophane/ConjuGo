@@ -47,6 +47,12 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - Collection locale avec suivi des doublons
 - Page dediee progression: niveau, xp, badges, collection
 - Gestion pedagogique des contractions: je -> j' devant voyelle/h muet
+- Mode famille local (nouveau):
+  - Profil enfant actif selectionnable
+  - Progression stockee par enfant (stats, badges, xp, collection)
+  - Mode parent/admin protege par PIN (par defaut: 1234)
+  - Ajout de profils enfants (nom + PIN)
+  - Vue parent: recap rapide des stats de tous les enfants
 
 ## 4) Logique de generation (anti-repetition)
 
@@ -138,6 +144,28 @@ Puis ouvrir:
 
 ```bash
 docker compose down
+```
+
+### Mettre a jour l'application
+
+Commande manuelle:
+
+```bash
+docker compose down
+git pull --ff-only origin main
+docker compose up -d --build --remove-orphans
+```
+
+Script direct:
+
+```bash
+./update.sh
+```
+
+Option (branche cible):
+
+```bash
+./update.sh main
 ```
 
 ## 11) Deploiement sur machine Ampere (ARM64)

@@ -4,7 +4,10 @@ const SESSION_SIZE = 10;
 const RECENT_VERB_WINDOW = 2;
 const STORAGE_KEY = "conjugo-preferences-v1";
 const PROGRESS_KEY = "conjugo-progress-v1";
-const APP_VERSION = "v2026.05.24.7";
+const FAMILY_KEY = "conjugo-family-v1";
+const FAMILY_SERVER_CACHE_KEY = "conjugo-family-server-cache-v1";
+const FAMILY_API_ENDPOINT = "/api/family-state";
+const APP_VERSION = "v2026.05.27.1";
 
 const STICKER_SOURCES = [
   "./stickers/brainy-rocket.svg",
@@ -68,6 +71,10 @@ const state = {
   errors: [],
   answered: false,
   user: null,
+  family: null,
+  activeChildId: "",
+  progressStore: null,
+  isParentMode: false,
   progress: null,
   sessionReward: {
     coins: 0,
@@ -87,6 +94,17 @@ const el = {
     result: document.getElementById("view-result")
   },
   cards: Array.from(document.querySelectorAll(".cat-card")),
+  familyStatusLine: document.getElementById("familyStatusLine"),
+  activeChildSelect: document.getElementById("activeChildSelect"),
+  parentModeBtn: document.getElementById("parentModeBtn"),
+  leaveParentModeBtn: document.getElementById("leaveParentModeBtn"),
+  progressChildLine: document.getElementById("progressChildLine"),
+  parentAdminPanel: document.getElementById("parentAdminPanel"),
+  addChildForm: document.getElementById("addChildForm"),
+  childNameInput: document.getElementById("childNameInput"),
+  childPinInput: document.getElementById("childPinInput"),
+  adminMsg: document.getElementById("adminMsg"),
+  childrenOverview: document.getElementById("childrenOverview"),
   selectionSummary: document.getElementById("selectionSummary"),
   startBtn: document.getElementById("startBtn"),
   progressBtn: document.getElementById("progressBtn"),
@@ -141,15 +159,19 @@ function renderUserHeader() {
     return;
   }
 
-  if (!state.user) {
-    subtitleEl.textContent = "Le mini-jeu du present";
+  const activeChild = getActiveChild();
+  const modeLabel = state.isParentMode ? "parent/admin" : "enfant";
+
+  subtitleEl.textContent = "Le mini-jeu du present";
+
+  if (!state.user && !activeChild) {
     userLineEl.hidden = true;
     return;
   }
 
-  const firstName = toFirstName(state.user.displayName) || "champion";
-  subtitleEl.textContent = "Le mini-jeu du present";
-  userLineEl.textContent = `Connecte: ${firstName}`;
+  const firstName = state.user ? toFirstName(state.user.displayName) : "local";
+  const childName = activeChild ? activeChild.name : "-";
+  userLineEl.textContent = `Compte: ${firstName} · Profil: ${childName} · Mode: ${modeLabel}`;
   userLineEl.hidden = false;
 }
 
@@ -164,10 +186,320 @@ async function loadConnectedUser() {
     if (payload && payload.user) {
       state.user = payload.user;
       renderUserHeader();
+      renderFamilyUI();
     }
   } catch (_error) {
     // Front remains usable even if backend user API is unavailable.
   }
+}
+
+function defaultFamily() {
+  const defaultChildId = "child-1";
+  return {
+    parent: {
+      name: "Parent Admin",
+      pin: "1234"
+    },
+    children: [
+      {
+        id: defaultChildId,
+        name: "Eleve 1",
+        pin: "1111",
+        createdAt: Date.now()
+      }
+    ],
+    activeChildId: defaultChildId
+  };
+}
+
+function makeChildId() {
+  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+    return `child-${window.crypto.randomUUID()}`;
+  }
+  return `child-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
+
+function cleanPin(value) {
+  return String(value || "").trim();
+}
+
+function getActiveChild() {
+  if (!state.family) {
+    return null;
+  }
+  return state.family.children.find((child) => child.id === state.activeChildId) || null;
+}
+
+function ensureFamilyShape(input) {
+  const fallback = defaultFamily();
+  if (!input || typeof input !== "object") {
+    return fallback;
+  }
+
+  const parentName = input.parent && typeof input.parent.name === "string" ? input.parent.name : fallback.parent.name;
+  const parentPin = input.parent && cleanPin(input.parent.pin) ? cleanPin(input.parent.pin) : fallback.parent.pin;
+
+  const children = Array.isArray(input.children)
+    ? input.children
+        .filter((child) => child && typeof child.name === "string")
+        .map((child, index) => ({
+          id: child.id || `child-${index + 1}`,
+          name: child.name.trim() || `Eleve ${index + 1}`,
+          pin: cleanPin(child.pin) || "0000",
+          createdAt: Number(child.createdAt) || Date.now()
+        }))
+    : fallback.children;
+
+  if (!children.length) {
+    children.push(...fallback.children);
+  }
+
+  const activeChildId = children.some((child) => child.id === input.activeChildId)
+    ? input.activeChildId
+    : children[0].id;
+
+  return {
+    parent: { name: parentName, pin: parentPin },
+    children,
+    activeChildId
+  };
+}
+
+function saveFamily() {
+  if (!state.family) {
+    return;
+  }
+
+  state.family.activeChildId = state.activeChildId;
+  localStorage.setItem(FAMILY_KEY, JSON.stringify(state.family));
+  scheduleServerPersist();
+}
+
+function loadFamily() {
+  try {
+    const raw = localStorage.getItem(FAMILY_KEY);
+    if (!raw) {
+      state.family = defaultFamily();
+      state.activeChildId = state.family.activeChildId;
+      saveFamily();
+      return;
+    }
+
+    state.family = ensureFamilyShape(JSON.parse(raw));
+    state.activeChildId = state.family.activeChildId;
+  } catch (_error) {
+    state.family = defaultFamily();
+    state.activeChildId = state.family.activeChildId;
+    saveFamily();
+  }
+}
+
+function normalizeProgressStore(input, activeChildId) {
+  if (input && typeof input === "object" && input.schema === 2 && input.byChild && typeof input.byChild === "object") {
+    return {
+      schema: 2,
+      activeChildId,
+      byChild: { ...input.byChild }
+    };
+  }
+
+  return {
+    schema: 2,
+    activeChildId,
+    byChild: activeChildId ? { [activeChildId]: defaultProgress() } : {}
+  };
+}
+
+function buildFamilyPayload() {
+  return {
+    family: state.family,
+    progressStore: state.progressStore
+  };
+}
+
+function cacheFamilyPayloadLocally() {
+  try {
+    const payload = buildFamilyPayload();
+    localStorage.setItem(FAMILY_SERVER_CACHE_KEY, JSON.stringify(payload));
+  } catch (_error) {
+    // Ignore cache failures.
+  }
+}
+
+let persistTimer = null;
+
+function scheduleServerPersist() {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+  }
+
+  persistTimer = setTimeout(() => {
+    persistFamilyStateToServer();
+  }, 120);
+}
+
+async function persistFamilyStateToServer() {
+  if (!state.family || !state.progressStore) {
+    return;
+  }
+
+  cacheFamilyPayloadLocally();
+
+  try {
+    await fetch(FAMILY_API_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(buildFamilyPayload())
+    });
+  } catch (_error) {
+    // App remains usable even if server sync temporarily fails.
+  }
+}
+
+async function loadFamilyStateFromServer() {
+  try {
+    const response = await fetch(FAMILY_API_ENDPOINT, { cache: "no-store" });
+    if (response.ok) {
+      const payload = await response.json();
+      if (payload && payload.family && payload.progressStore) {
+        state.family = ensureFamilyShape(payload.family);
+        state.activeChildId = state.family.activeChildId;
+        state.progressStore = normalizeProgressStore(payload.progressStore, state.activeChildId);
+
+        if (state.activeChildId && !state.progressStore.byChild[state.activeChildId]) {
+          state.progressStore.byChild[state.activeChildId] = defaultProgress();
+        }
+
+        state.progress = getProgressSnapshotForChild(state.activeChildId);
+        localStorage.setItem(FAMILY_KEY, JSON.stringify(state.family));
+        localStorage.setItem(PROGRESS_KEY, JSON.stringify(state.progressStore));
+        cacheFamilyPayloadLocally();
+        return;
+      }
+    }
+  } catch (_error) {
+    // Fallback to local cache below.
+  }
+
+  try {
+    const cached = localStorage.getItem(FAMILY_SERVER_CACHE_KEY);
+    if (cached) {
+      const payload = JSON.parse(cached);
+      if (payload && payload.family && payload.progressStore) {
+        state.family = ensureFamilyShape(payload.family);
+        state.activeChildId = state.family.activeChildId;
+        state.progressStore = normalizeProgressStore(payload.progressStore, state.activeChildId);
+        if (state.activeChildId && !state.progressStore.byChild[state.activeChildId]) {
+          state.progressStore.byChild[state.activeChildId] = defaultProgress();
+        }
+        state.progress = getProgressSnapshotForChild(state.activeChildId);
+        return;
+      }
+    }
+  } catch (_error) {
+    // Ignore malformed cache and fallback to legacy keys.
+  }
+
+  loadFamily();
+  loadProgress();
+}
+
+function getProgressSnapshotForChild(childId) {
+  if (!state.progressStore || !state.progressStore.byChild) {
+    return defaultProgress();
+  }
+  return {
+    ...defaultProgress(),
+    ...(state.progressStore.byChild[childId] || {})
+  };
+}
+
+function renderChildrenOverview() {
+  if (!el.childrenOverview || !state.family) {
+    return;
+  }
+
+  el.childrenOverview.innerHTML = "";
+
+  state.family.children.forEach((child) => {
+    const progress = getProgressSnapshotForChild(child.id);
+    const accuracy = progress.totalQuestions ? Math.round((progress.totalCorrect / progress.totalQuestions) * 100) : 0;
+
+    const row = document.createElement("article");
+    row.className = "child-row";
+
+    const title = document.createElement("strong");
+    title.textContent = child.name;
+
+    const stats = document.createElement("p");
+    stats.textContent = `Sessions ${progress.sessionsCount} · Best ${progress.bestScore}/${SESSION_SIZE} · Precision ${accuracy}%`;
+
+    row.appendChild(title);
+    row.appendChild(stats);
+    el.childrenOverview.appendChild(row);
+  });
+}
+
+function renderFamilyUI() {
+  if (!state.family) {
+    return;
+  }
+
+  const activeChild = getActiveChild();
+
+  if (el.activeChildSelect) {
+    el.activeChildSelect.innerHTML = "";
+
+    state.family.children.forEach((child) => {
+      const option = document.createElement("option");
+      option.value = child.id;
+      option.textContent = child.name;
+      if (child.id === state.activeChildId) {
+        option.selected = true;
+      }
+      el.activeChildSelect.appendChild(option);
+    });
+  }
+
+  if (el.familyStatusLine) {
+    const modeLabel = state.isParentMode ? "parent/admin" : "enfant";
+    el.familyStatusLine.textContent = `Profil actif: ${activeChild ? activeChild.name : "-"} · Mode ${modeLabel}`;
+  }
+
+  if (el.progressChildLine) {
+    el.progressChildLine.textContent = `Profil: ${activeChild ? activeChild.name : "-"}`;
+  }
+
+  if (el.parentAdminPanel) {
+    el.parentAdminPanel.hidden = !state.isParentMode;
+  }
+
+  if (el.leaveParentModeBtn) {
+    el.leaveParentModeBtn.hidden = !state.isParentMode;
+  }
+
+  renderChildrenOverview();
+}
+
+function switchActiveChild(nextChildId) {
+  if (!state.family) {
+    return;
+  }
+
+  const child = state.family.children.find((entry) => entry.id === nextChildId);
+  if (!child) {
+    return;
+  }
+
+  state.activeChildId = child.id;
+  state.family.activeChildId = child.id;
+  loadProgress();
+  renderFamilyUI();
+  renderProgressPanel();
+  renderUserHeader();
+  saveFamily();
 }
 
 function defaultProgress() {
@@ -200,29 +532,89 @@ function getProgressLevel(progress) {
 }
 
 function loadProgress() {
+  const activeChildId = state.activeChildId || (state.family && state.family.activeChildId) || "";
+
   try {
     const raw = localStorage.getItem(PROGRESS_KEY);
     if (!raw) {
-      state.progress = defaultProgress();
+      state.progressStore = {
+        schema: 2,
+        activeChildId,
+        byChild: activeChildId ? { [activeChildId]: defaultProgress() } : {}
+      };
+      state.progress = getProgressSnapshotForChild(activeChildId);
+      saveProgress();
       return;
     }
+
     const parsed = JSON.parse(raw);
-    state.progress = { ...defaultProgress(), ...parsed };
+
+    if (parsed && typeof parsed === "object" && parsed.schema === 2 && parsed.byChild) {
+      state.progressStore = {
+        schema: 2,
+        activeChildId,
+        byChild: { ...parsed.byChild }
+      };
+    } else {
+      // Legacy migration: old payload stored one single progress object.
+      const legacyProgress = { ...defaultProgress(), ...(parsed || {}) };
+      state.progressStore = {
+        schema: 2,
+        activeChildId,
+        byChild: activeChildId ? { [activeChildId]: legacyProgress } : {}
+      };
+    }
+
+    if (activeChildId && !state.progressStore.byChild[activeChildId]) {
+      state.progressStore.byChild[activeChildId] = defaultProgress();
+    }
+
+    state.progress = getProgressSnapshotForChild(activeChildId);
+    saveProgress();
   } catch (_error) {
-    state.progress = defaultProgress();
+    state.progressStore = {
+      schema: 2,
+      activeChildId,
+      byChild: activeChildId ? { [activeChildId]: defaultProgress() } : {}
+    };
+    state.progress = getProgressSnapshotForChild(activeChildId);
+    saveProgress();
   }
 }
 
 function saveProgress() {
-  if (!state.progress) {
+  if (!state.progressStore) {
     return;
   }
-  localStorage.setItem(PROGRESS_KEY, JSON.stringify(state.progress));
+
+  const activeChildId = state.activeChildId;
+  if (!activeChildId) {
+    return;
+  }
+
+  state.progressStore.schema = 2;
+  state.progressStore.activeChildId = activeChildId;
+  state.progressStore.byChild = state.progressStore.byChild || {};
+  state.progressStore.byChild[activeChildId] = {
+    ...defaultProgress(),
+    ...(state.progress || {})
+  };
+
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify(state.progressStore));
+  scheduleServerPersist();
 }
 
 function renderProgressPanel() {
   if (!state.progress) {
     return;
+  }
+
+  const activeChild = getActiveChild();
+  if (el.progressChildLine) {
+    el.progressChildLine.textContent = `Profil: ${activeChild ? activeChild.name : "-"}`;
+  }
+  if (el.parentAdminPanel) {
+    el.parentAdminPanel.hidden = !state.isParentMode;
   }
 
   const accuracy = state.progress.totalQuestions
@@ -830,6 +1222,118 @@ function backToTraining() {
   updateConfigUI();
 }
 
+function showAdminMessage(message) {
+  if (!el.adminMsg) {
+    return;
+  }
+  el.adminMsg.textContent = message;
+}
+
+function handleParentMode() {
+  if (!state.family) {
+    return;
+  }
+
+  const pin = cleanPin(window.prompt("Code parent/admin:"));
+  if (!pin) {
+    showAdminMessage("Activation annulee.");
+    return;
+  }
+
+  if (pin !== cleanPin(state.family.parent.pin)) {
+    showAdminMessage("Code incorrect.");
+    return;
+  }
+
+  state.isParentMode = true;
+  showAdminMessage("Mode parent/admin active.");
+  renderFamilyUI();
+  renderProgressPanel();
+  renderUserHeader();
+}
+
+function handleLeaveParentMode() {
+  state.isParentMode = false;
+  showAdminMessage("Mode enfant actif.");
+  renderFamilyUI();
+  renderProgressPanel();
+  renderUserHeader();
+}
+
+function handleChildSwitch(event) {
+  if (!state.family || !el.activeChildSelect) {
+    return;
+  }
+
+  const targetChildId = event.target.value;
+  if (!targetChildId || targetChildId === state.activeChildId) {
+    return;
+  }
+
+  const targetChild = state.family.children.find((child) => child.id === targetChildId);
+  if (!targetChild) {
+    return;
+  }
+
+  if (!state.isParentMode) {
+    const pin = cleanPin(window.prompt(`PIN de ${targetChild.name}:`));
+    if (pin !== cleanPin(targetChild.pin)) {
+      el.activeChildSelect.value = state.activeChildId;
+      showAdminMessage("PIN enfant incorrect.");
+      return;
+    }
+  }
+
+  switchActiveChild(targetChildId);
+  showAdminMessage(`Profil actif: ${targetChild.name}.`);
+}
+
+function handleAddChild(event) {
+  event.preventDefault();
+
+  if (!state.family || !state.isParentMode) {
+    showAdminMessage("Active le mode parent/admin pour ajouter un profil.");
+    return;
+  }
+
+  const name = String(el.childNameInput && el.childNameInput.value ? el.childNameInput.value : "").trim();
+  const pin = cleanPin(el.childPinInput && el.childPinInput.value ? el.childPinInput.value : "");
+
+  if (name.length < 2) {
+    showAdminMessage("Nom enfant trop court.");
+    return;
+  }
+  if (pin.length < 4) {
+    showAdminMessage("PIN enfant trop court (4 chiffres min).");
+    return;
+  }
+
+  const child = {
+    id: makeChildId(),
+    name,
+    pin,
+    createdAt: Date.now()
+  };
+
+  state.family.children.push(child);
+  if (!state.progressStore) {
+    state.progressStore = { schema: 2, activeChildId: state.activeChildId, byChild: {} };
+  }
+  state.progressStore.byChild[child.id] = defaultProgress();
+  saveFamily();
+  saveProgress();
+
+  if (el.childNameInput) {
+    el.childNameInput.value = "";
+  }
+  if (el.childPinInput) {
+    el.childPinInput.value = "";
+  }
+
+  renderFamilyUI();
+  showAdminMessage(`Profil enfant ajoute: ${child.name}.`);
+}
+
 function handleCategoryToggle(event) {
   const button = event.currentTarget;
   const category = button.dataset.category;
@@ -846,6 +1350,18 @@ function handleCategoryToggle(event) {
 
 function bindEvents() {
   el.cards.forEach((card) => card.addEventListener("click", handleCategoryToggle));
+  if (el.activeChildSelect) {
+    el.activeChildSelect.addEventListener("change", handleChildSwitch);
+  }
+  if (el.parentModeBtn) {
+    el.parentModeBtn.addEventListener("click", handleParentMode);
+  }
+  if (el.leaveParentModeBtn) {
+    el.leaveParentModeBtn.addEventListener("click", handleLeaveParentMode);
+  }
+  if (el.addChildForm) {
+    el.addChildForm.addEventListener("submit", handleAddChild);
+  }
   el.startBtn.addEventListener("click", startSession);
   el.progressBtn.addEventListener("click", navigateToProgress);
   el.backTrainingBtn.addEventListener("click", backToTraining);
@@ -886,16 +1402,16 @@ function bindPwaInstall() {
   }
 }
 
-function init() {
+async function init() {
   const versionEl = document.getElementById("appVersion");
   if (versionEl) {
     versionEl.textContent = APP_VERSION;
   }
 
-  renderUserHeader();
-
+  await loadFamilyStateFromServer();
   loadPreferences();
-  loadProgress();
+  renderFamilyUI();
+  renderUserHeader();
   updateConfigUI();
   renderProgressPanel();
   bindEvents();

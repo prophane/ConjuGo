@@ -34,6 +34,19 @@
         <h2 id="config-title">Choisis ton entrainement</h2>
         <p class="hint">Selectionne au moins 1 categorie.</p>
 
+        <section class="family-panel" aria-labelledby="family-title">
+          <h3 id="family-title">Profils famille</h3>
+          <p class="hint" id="familyStatusLine">Profil actif: -</p>
+          <div class="family-actions">
+            <label>
+              Enfant actif
+              <select id="activeChildSelect"></select>
+            </label>
+            <button id="parentModeBtn" class="ghost strong" type="button">Mode parent/admin</button>
+            <button id="leaveParentModeBtn" class="ghost" type="button" hidden>Quitter mode parent</button>
+          </div>
+        </section>
+
         <div class="grid-cards" id="categoryGrid" role="group" aria-label="Categories de verbes">
           <button class="cat-card" data-category="etre" aria-pressed="false">
             <span class="cat-icon">⭐</span>
@@ -70,6 +83,7 @@
           <div>
             <h2 id="progress-title">Ma progression</h2>
             <p class="hint">Niveau, xp, recompenses et collection.</p>
+            <p class="hint" id="progressChildLine">Profil: -</p>
           </div>
           <button id="backTrainingBtn" class="ghost strong">Retour entrainement</button>
         </div>
@@ -101,6 +115,26 @@
             <p>Pieces: <strong id="statCoins">0</strong></p>
           </div>
           <div class="badge-wall" id="badgeWall" aria-live="polite"></div>
+        </section>
+
+        <section class="tracker-panel" id="parentAdminPanel" aria-labelledby="parentAdminTitle" hidden>
+          <h3 id="parentAdminTitle">Espace parent/admin</h3>
+          <p class="hint">Ajoute des profils enfants et suis leur progression globale.</p>
+          <form id="addChildForm" class="admin-form">
+            <input id="childNameInput" type="text" minlength="2" maxlength="20" placeholder="Nom enfant" required />
+            <input
+              id="childPinInput"
+              type="password"
+              minlength="4"
+              maxlength="8"
+              inputmode="numeric"
+              placeholder="PIN enfant"
+              required
+            />
+            <button class="cta small" type="submit">Ajouter profil</button>
+          </form>
+          <p id="adminMsg" class="hint" aria-live="polite"></p>
+          <div id="childrenOverview" class="children-overview"></div>
         </section>
 
         <section class="gallery-panel" aria-labelledby="galleryTitle">

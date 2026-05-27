@@ -195,6 +195,79 @@ h1 {
   font-weight: 700;
 }
 
+.family-panel {
+  margin: 10px 0 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+
+.family-panel h3 {
+  margin: 0;
+}
+
+.family-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.family-actions label {
+  display: grid;
+  gap: 6px;
+  font-weight: 800;
+}
+
+.family-actions select {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: 8px 10px;
+}
+
+.admin-form {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-form input {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: 8px 10px;
+}
+
+.children-overview {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.child-row {
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 8px 10px;
+  display: grid;
+  gap: 2px;
+}
+
+.child-row strong {
+  font-family: var(--font-title);
+}
+
+.child-row p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #475569;
+}
+
 .home-actions {
   display: grid;
   gap: 10px;
@@ -689,5 +762,11 @@ button:focus-visible {
 
   .options {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .family-actions,
+  .admin-form {
+    grid-template-columns: repeat(3, 1fr);
+    align-items: end;
   }
 }

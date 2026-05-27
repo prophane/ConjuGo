@@ -6,6 +6,7 @@ const crypto = require("node:crypto");
 const PORT = Number(process.env.PORT || 3077);
 const PUBLIC_DIR = __dirname;
 const USER_DB_FILE = process.env.USER_DB_FILE || path.join(__dirname, "data", "users.json");
+const FAMILY_DB_FILE = process.env.FAMILY_DB_FILE || path.join(__dirname, "data", "family-state.json");
 const SSO_SUB_HEADER = (process.env.SSO_SUB_HEADER || "x-pangolin-sub").toLowerCase();
 const SSO_EMAIL_HEADER = (process.env.SSO_EMAIL_HEADER || "x-pangolin-email").toLowerCase();
 const SSO_NAME_HEADER = (process.env.SSO_NAME_HEADER || "x-pangolin-name").toLowerCase();
@@ -69,10 +70,72 @@ function safeReadJson(filePath) {
   }
 }
 
+function safeReadJsonWithDefault(filePath, defaultValue) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    return JSON.parse(raw);
+  } catch (_error) {
+    return defaultValue;
+  }
+}
+
 function safeWriteJson(filePath, payload) {
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf-8");
+}
+
+function readRequestBody(request) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+
+    request.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 1024 * 1024) {
+        reject(new Error("payload_too_large"));
+      }
+    });
+
+    request.on("end", () => resolve(body));
+    request.on("error", reject);
+  });
+}
+
+function defaultFamilyState() {
+  const childId = "child-1";
+  return {
+    family: {
+      parent: { name: "Parent Admin", pin: "1234" },
+      children: [{ id: childId, name: "Eleve 1", pin: "1111", createdAt: Date.now() }],
+      activeChildId: childId
+    },
+    progressStore: {
+      schema: 2,
+      activeChildId: childId,
+      byChild: {
+        [childId]: {
+          sessionsCount: 0,
+          totalQuestions: 0,
+          totalCorrect: 0,
+          bestScore: 0,
+          currentStreak: 0,
+          maxStreak: 0,
+          coins: 0,
+          xp: 0,
+          badges: [],
+          collection: {}
+        }
+      }
+    }
+  };
+}
+
+function readFamilyState() {
+  return safeReadJsonWithDefault(FAMILY_DB_FILE, defaultFamilyState());
+}
+
+function writeFamilyState(payload) {
+  safeWriteJson(FAMILY_DB_FILE, payload);
 }
 
 function normalizeEmail(value) {
@@ -284,6 +347,40 @@ const server = http.createServer((request, response) => {
     }
 
     sendJson(response, 200, { user: result.user, identitySource: result.identitySource });
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/family-state") {
+    sendJson(response, 200, readFamilyState());
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/family-state") {
+    readRequestBody(request)
+      .then((rawBody) => {
+        let parsed = null;
+        try {
+          parsed = rawBody ? JSON.parse(rawBody) : null;
+        } catch (_error) {
+          sendJson(response, 400, { error: "invalid_json" });
+          return;
+        }
+
+        if (!parsed || typeof parsed !== "object" || !parsed.family || !parsed.progressStore) {
+          sendJson(response, 400, { error: "invalid_payload" });
+          return;
+        }
+
+        writeFamilyState(parsed);
+        sendJson(response, 200, { ok: true });
+      })
+      .catch((error) => {
+        if (error && error.message === "payload_too_large") {
+          sendJson(response, 413, { error: "payload_too_large" });
+          return;
+        }
+        sendJson(response, 500, { error: "read_body_failed" });
+      });
     return;
   }
 
