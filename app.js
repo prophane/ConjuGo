@@ -197,8 +197,9 @@ function renderUserHeader() {
   }
 
   const firstName = state.user ? toFirstName(state.user.displayName) : "local";
+  const accountRole = isConnectedParent() ? "parent" : "enfant";
   const childName = getChildDisplayName(activeChild);
-  userLineEl.textContent = `Compte: ${firstName} · Profil: ${childName} · Mode: ${modeLabel}`;
+  userLineEl.textContent = `Compte: ${firstName} (${accountRole}) · Enfant suivi: ${childName} · Mode: ${modeLabel}`;
   userLineEl.hidden = false;
 }
 
@@ -561,7 +562,7 @@ function renderFamilyUI() {
 
   if (el.familyStatusLine) {
     const modeLabel = state.isParentMode ? "parent/admin" : "enfant";
-    el.familyStatusLine.textContent = `Profil actif: ${getChildDisplayName(activeChild)} · Mode ${modeLabel}`;
+    el.familyStatusLine.textContent = `Enfant suivi: ${getChildDisplayName(activeChild)} · Mode ${modeLabel}`;
   }
 
   if (el.selectionFollowLine) {
