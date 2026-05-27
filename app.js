@@ -8,6 +8,7 @@ const FAMILY_KEY = "conjugo-family-v1";
 const FAMILY_SERVER_CACHE_KEY = "conjugo-family-server-cache-v1";
 const FAMILY_API_ENDPOINT = "/api/family-state";
 const APP_VERSION = "v2026.05.27.1";
+const STICKER_CATALOG_SIZE = 500;
 
 const STICKER_SOURCES = [
   "./stickers/brainy-rocket.svg",
@@ -16,36 +17,7 @@ const STICKER_SOURCES = [
   "./stickers/brainy-slime.svg"
 ];
 
-const CARD_DEFS = [
-  {
-    id: "rocket_rider",
-    name: "Rocket Rider",
-    rarity: "Rare",
-    image: "./stickers/brainy-rocket.svg",
-    line: "Turbo conjugaison"
-  },
-  {
-    id: "shark_blitz",
-    name: "Shark Blitz",
-    rarity: "Epic",
-    image: "./stickers/brainy-shark.svg",
-    line: "Mord les fautes"
-  },
-  {
-    id: "toast_king",
-    name: "Toast King",
-    rarity: "Common",
-    image: "./stickers/brainy-toast.svg",
-    line: "Chaud devant"
-  },
-  {
-    id: "slime_combo",
-    name: "Slime Combo",
-    rarity: "Common",
-    image: "./stickers/brainy-slime.svg",
-    line: "Combo gluant"
-  }
-];
+const CARD_DEFS = buildStickerCatalog(STICKER_CATALOG_SIZE);
 
 const REWARD_DEFS = [
   { id: "first_session", label: "Premier pas", check: (p) => p.sessionsCount >= 1 },
@@ -135,6 +107,7 @@ const el = {
   progressXpText: document.getElementById("progressXpText"),
   progressXpBar: document.getElementById("progressXpBar"),
   progressNextGoal: document.getElementById("progressNextGoal"),
+  unlockProgressLine: document.getElementById("unlockProgressLine"),
   badgeWall: document.getElementById("badgeWall"),
   collectionGrid: document.getElementById("collectionGrid"),
   earnedCoins: document.getElementById("earnedCoins"),
@@ -149,6 +122,60 @@ function toFirstName(fullName) {
     return "";
   }
   return fullName.trim().split(/\s+/)[0] || "";
+}
+
+function buildStickerCatalog(total) {
+  const themes = ["Rocket", "Shark", "Toast", "Slime"];
+
+  return Array.from({ length: total }, (_value, index) => {
+    const tier = index + 1;
+    const image = STICKER_SOURCES[index % STICKER_SOURCES.length];
+    const theme = themes[index % themes.length];
+    const rarity = tier % 10 === 0 ? "Epic" : tier % 4 === 0 ? "Rare" : "Common";
+
+    return {
+      id: `sticker-${String(tier).padStart(3, "0")}`,
+      name: `${theme} ${String(tier).padStart(3, "0")}`,
+      rarity,
+      image,
+      line: `Serie ${tier}`
+    };
+  });
+}
+
+function getUnlockedCount(progress) {
+  if (!progress || !progress.collection) {
+    return 0;
+  }
+
+  return Object.values(progress.collection).filter((count) => Number(count || 0) > 0).length;
+}
+
+function getStickerUnlockTarget(progress) {
+  const levelInfo = getProgressLevel(progress);
+  const unlocksPerLevel = 25;
+  const target = ((levelInfo.level - 1) * unlocksPerLevel) + ((levelInfo.xpIntoLevel / LEVEL_SIZE) * unlocksPerLevel);
+  return Math.min(CARD_DEFS.length, Math.floor(target));
+}
+
+function unlockCardsForProgress(progress) {
+  const unlockedNow = [];
+  const target = getStickerUnlockTarget(progress);
+  const unlockedCount = getUnlockedCount(progress);
+
+  if (target <= unlockedCount) {
+    return unlockedNow;
+  }
+
+  const missing = target - unlockedCount;
+  const lockedCards = shuffle(CARD_DEFS.filter((card) => Number(progress.collection[card.id] || 0) === 0));
+
+  lockedCards.slice(0, missing).forEach((card) => {
+    progress.collection[card.id] = 1;
+    unlockedNow.push(card);
+  });
+
+  return unlockedNow;
 }
 
 function renderUserHeader() {
@@ -264,7 +291,7 @@ function defaultFamily() {
     children: [
       {
         id: defaultChildId,
-        name: "Eleve 1",
+        name: "Enfant",
         pin: "1111",
         createdAt: Date.now()
       }
@@ -312,7 +339,7 @@ function ensureFamilyShape(input) {
         .filter((child) => child && typeof child.name === "string")
         .map((child, index) => ({
           id: child.id || `child-${index + 1}`,
-          name: child.name.trim() || `Eleve ${index + 1}`,
+          name: child.name.trim() || `Enfant ${index + 1}`,
           pin: cleanPin(child.pin) || "0000",
           createdAt: Number(child.createdAt) || Date.now()
         }))
@@ -733,6 +760,12 @@ function renderProgressPanel() {
     el.statCoins.textContent = String(state.progress.coins);
   }
 
+  if (el.unlockProgressLine) {
+    const unlockedCount = getUnlockedCount(state.progress);
+    const target = getStickerUnlockTarget(state.progress);
+    el.unlockProgressLine.textContent = `Stickers debloques: ${unlockedCount} / ${CARD_DEFS.length} · Objectif courant: ${target}`;
+  }
+
   if (el.badgeWall) {
     el.badgeWall.innerHTML = "";
     if (!state.progress.badges.length) {
@@ -752,22 +785,32 @@ function renderProgressPanel() {
 
   if (el.collectionGrid) {
     el.collectionGrid.innerHTML = "";
-    CARD_DEFS.forEach((card) => {
+    const unlockedCards = CARD_DEFS.filter((card) => Number(state.progress.collection[card.id] || 0) > 0);
+
+    if (!unlockedCards.length) {
+      const empty = document.createElement("p");
+      empty.className = "hint";
+      empty.textContent = "Aucun sticker gagne pour l'instant. Lance une session pour debloquer rapidement.";
+      el.collectionGrid.appendChild(empty);
+      return;
+    }
+
+    unlockedCards.forEach((card) => {
       const count = Number(state.progress.collection[card.id] || 0);
       const article = document.createElement("article");
-      article.className = `collect-card ${count ? "unlocked" : "locked"}`;
+      article.className = "collect-card unlocked";
 
       const img = document.createElement("img");
       img.src = card.image;
-      img.alt = count ? `Carte ${card.name}` : "Carte verrouillee";
+      img.alt = `Sticker ${card.name}`;
 
       const title = document.createElement("p");
       title.className = "collect-title";
-      title.textContent = count ? card.name : "???";
+      title.textContent = card.name;
 
       const meta = document.createElement("p");
       meta.className = "collect-meta";
-      meta.textContent = count ? `${card.rarity} · x${count}` : "A debloquer";
+      meta.textContent = `${card.rarity} · x${count}`;
 
       article.appendChild(img);
       article.appendChild(title);
@@ -800,10 +843,17 @@ function applySessionRewards() {
   const earnedXp = state.score * 10 + (state.score === SESSION_SIZE ? 20 : 0) + (state.score >= 8 ? 10 : 0);
   progress.xp += earnedXp;
 
-  const drawnCard = drawRewardCard(state.score);
-  const previousCount = Number(progress.collection[drawnCard.id] || 0);
-  progress.collection[drawnCard.id] = previousCount + 1;
-  const wasNewCard = previousCount === 0;
+  const unlockedCards = unlockCardsForProgress(progress);
+  const drawnCard = unlockedCards.length ? unlockedCards[unlockedCards.length - 1] : drawRewardCard(state.score, progress);
+  let wasNewCard = false;
+
+  if (unlockedCards.length) {
+    wasNewCard = true;
+  } else {
+    const previousCount = Number(progress.collection[drawnCard.id] || 0);
+    progress.collection[drawnCard.id] = previousCount + 1;
+    wasNewCard = previousCount === 0;
+  }
 
   if (drawnCard.rarity === "Epic") {
     progress.coins += 3;
@@ -832,10 +882,12 @@ function applySessionRewards() {
   renderProgressPanel();
 }
 
-function drawRewardCard(score) {
+function drawRewardCard(score, progress) {
+  const unlockedCards = CARD_DEFS.filter((card) => Number(progress && progress.collection ? progress.collection[card.id] || 0 : 0) > 0);
+  const source = unlockedCards.length ? unlockedCards : CARD_DEFS;
   const weighted = [];
 
-  CARD_DEFS.forEach((card) => {
+  source.forEach((card) => {
     let weight = 1;
     if (card.rarity === "Common") {
       weight = 6;
