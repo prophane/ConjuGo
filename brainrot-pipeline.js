@@ -2,40 +2,40 @@ window.BRAINROT_PIPELINE = (() => {
   const systemPrompt = [
     "Tu ecris des brainrots internet-native en francais.",
     "Interdits: ton scolaire, explications meta, paraphrase plate, politesse neutre.",
-    "Sortie: 3 a 6 phrases max, nerveuses et concretes.",
-    "Obligations: au moins 2 images mentales visibles, 1 personnification absurde.",
-    "Le texte doit escalader: chaque phrase monte en intensite.",
-    "La derniere phrase doit etre la plus forte."
+    "Sortie: 1 a 3 phrases max, courtes et incisives.",
+    "Obligations: au moins 2 images mentales concretes, 1 personnification absurde.",
+    "Escalade comique obligatoire.",
+    "La derniere phrase doit etre la plus forte et claquer comme une chute."
   ].join(" ");
 
   const stylePresets = {
     classic: {
       label: "Classic",
       energy: 1,
-      minScore: 68,
-      openers: ["Ce truc", "Le mot", "Ton objet", "La scene"],
-      verbs: ["sprinte", "gicle", "rebondit", "hurle", "degouline", "se teleporte"],
-      finishers: ["et la timeline explose", "et tout le quartier bugue", "et la realite prend feu doux"],
+      minScore: 78,
+      openers: ["Ce specimen", "Ton totem", "Cette relique", "Le brainrot"],
+      verbs: ["sprinte", "gicle", "rebondit", "hurle", "degouline", "pirouette"],
+      finishers: ["et la timeline casse en deux", "et le quartier freeze", "et la gravite ragequit"],
       hueBase: 35,
       satBase: 1.05
     },
     feral: {
       label: "Feral",
       energy: 1.35,
-      minScore: 74,
-      openers: ["Ce monstre", "Le brain", "Cette entite", "Le meme"],
-      verbs: ["griffe", "mord", "vrille", "vrombit", "fracture", "pirouette"],
-      finishers: ["et ton cerveau fait un salto", "et la rue part en karaoke sauvage", "et les horloges demandent pardon"],
+      minScore: 82,
+      openers: ["Ce monstre", "Le boss", "Cette entite", "Le meme"],
+      verbs: ["griffe", "mord", "vrille", "vrombit", "fracture", "detonne"],
+      finishers: ["et ton cerveau fait un salto arriere", "et la rue demarre en panique", "et les horloges se cachent"],
       hueBase: 145,
       satBase: 1.18
     },
     nuclear: {
       label: "Nuclear",
       energy: 1.7,
-      minScore: 80,
+      minScore: 86,
       openers: ["Ce cataclysme", "Le boss final", "La machine", "Le totem"],
       verbs: ["detonne", "atomise", "turbine", "sature", "court-circuite", "pulverise"],
-      finishers: ["et internet se met a genoux", "et les nuages font des wheelings", "et la gravite depose sa demission"],
+      finishers: ["et internet se met a genoux", "et les nuages font des wheelings", "et la gravite depose sa demission en hurlant"],
       hueBase: 265,
       satBase: 1.3
     }
@@ -47,7 +47,11 @@ window.BRAINROT_PIPELINE = (() => {
     "c'est chaotique",
     "chaotique",
     "en resume",
-    "cela signifie"
+    "cela signifie",
+    "en fait",
+    "on peut dire que",
+    "cette phrase",
+    "ce mot"
   ];
 
   const concreteImagery = [
@@ -59,6 +63,8 @@ window.BRAINROT_PIPELINE = (() => {
   const internetVibes = [
     "ratio", "lowres", "irl", "lag", "speedrun", "glitch", "timeline", "feed", "mode troll", "patch note"
   ];
+
+  const emblems = ["⚡", "🔥", "🛸", "🧠", "🦈", "🍞", "🧪", "🎛️", "💥", "🌪️", "🧨", "👾"];
 
   function hashText(text) {
     let h = 2166136261;
@@ -101,7 +107,7 @@ window.BRAINROT_PIPELINE = (() => {
     const preset = stylePresets[style] || stylePresets.classic;
     const rng = makeRng(`${input}|${style}|${seed}`);
     const token = String(input || "objet").trim().toLowerCase() || "objet";
-    const sentenceCount = 3 + Math.floor(rng() * 4);
+    const sentenceCount = 1 + Math.floor(rng() * 3);
 
     const imgA = pick(rng, concreteImagery);
     let imgB = pick(rng, concreteImagery);
@@ -113,17 +119,19 @@ window.BRAINROT_PIPELINE = (() => {
     const vibeB = pick(rng, internetVibes);
 
     const lines = [];
-    lines.push(`${capitalize(token)} debarque en ${pick(rng, preset.openers).toLowerCase()} avec ${imgA}, et le feed commence a trembler.`);
-    lines.push(`${capitalize(token)} ${pick(rng, preset.verbs)} comme un influenceur mal reveille, il exige des applaudissements au lampadaire.`);
+    const opener = `${capitalize(token)} sort du spawn avec ${imgA} et ${imgB}, en ${vibeA} violent.`;
+    const middle = `${pick(rng, preset.openers)} ${pick(rng, preset.verbs)} pendant que le frigo applaudit et que le trottoir panique.`;
+    const finisher = `Final: ${pick(rng, preset.finishers)}.`;
 
-    if (sentenceCount > 3) {
-      lines.push(`Puis ${imgB} surgit en ${vibeA}, et meme le trottoir veut faire un speedrun de panique.`);
+    lines.push(opener);
+    if (sentenceCount >= 2) {
+      lines.push(middle);
     }
-    if (sentenceCount > 4) {
-      lines.push(`Ensuite la scene passe en ${vibeB}, les murs clignotent et le frigo negocie un cessez-le-feu.`);
+    if (sentenceCount >= 3) {
+      lines.push(finisher);
+    } else {
+      lines[lines.length - 1] = `${lines[lines.length - 1]} ${finisher}`;
     }
-
-    lines.push(`Dernier palier: ${pick(rng, preset.finishers)}.`);
 
     return lines.slice(0, sentenceCount).join(" ");
   }
@@ -133,23 +141,25 @@ window.BRAINROT_PIPELINE = (() => {
     const sentences = sentenceSplit(text);
 
     const bannedHit = bannedPhrases.some((phrase) => text.includes(phrase));
-    const sentenceScore = sentences.length >= 3 && sentences.length <= 6 ? 20 : 0;
+    const sentenceScore = sentences.length >= 1 && sentences.length <= 3 ? 20 : 0;
 
     const imageryHits = concreteImagery.reduce((count, term) => count + (text.includes(term) ? 1 : 0), 0);
-    const visualScore = Math.min(20, imageryHits * 10);
+    const visualScore = Math.min(20, imageryHits >= 2 ? 20 : imageryHits * 8);
 
     const personificationMarkers = ["il exige", "le frigo", "le trottoir", "les murs", "la gravite", "le lampadaire"];
     const personificationHits = personificationMarkers.some((marker) => text.includes(marker));
-    const absurdityScore = personificationHits ? 20 : 8;
+    const absurdityScore = personificationHits ? 20 : 0;
 
     const vibeHits = internetVibes.reduce((count, token) => count + (text.includes(token) ? 1 : 0), 0);
-    const vibeScore = Math.min(20, vibeHits * 6 + (text.includes("dernier") ? 4 : 0));
+    const vibeScore = Math.min(20, vibeHits * 6 + (text.includes("final") ? 6 : 0));
 
-    const escalationScore = /(puis|ensuite|dernier palier|dernier niveau)/.test(text) ? 20 : 8;
+    const escalationScore = /(puis|ensuite|final|dernier palier|dernier niveau)/.test(text) ? 20 : 0;
+
+    const longTextPenalty = text.length > 260 ? 20 : 0;
 
     const total = bannedHit
       ? 0
-      : Math.max(0, Math.min(100, sentenceScore + visualScore + absurdityScore + vibeScore + escalationScore));
+      : Math.max(0, Math.min(100, sentenceScore + visualScore + absurdityScore + vibeScore + escalationScore - longTextPenalty));
 
     return {
       total,
@@ -160,7 +170,8 @@ window.BRAINROT_PIPELINE = (() => {
         absurdityScore,
         vibeScore,
         escalationScore,
-        bannedHit
+        bannedHit,
+        longTextPenalty
       }
     };
   }
@@ -224,8 +235,10 @@ window.BRAINROT_PIPELINE = (() => {
       const generated = generateWithQuality(subject, style, {
         seed,
         minScore: stylePresets[style].minScore,
-        maxAttempts: 8
+        maxAttempts: 10
       });
+
+      const emblem = emblems[hashText(subject) % emblems.length];
 
       catalog.push({
         id: `sticker-${String(tier).padStart(3, "0")}`,
@@ -235,6 +248,7 @@ window.BRAINROT_PIPELINE = (() => {
         family: stylePresets[style].label,
         line: generated.output,
         quality: generated.score.total,
+        emblem,
         hue: (stylePresets[style].hueBase + (index * 23)) % 360,
         sat: stylePresets[style].satBase + ((index % 5) * 0.04)
       });
@@ -244,12 +258,11 @@ window.BRAINROT_PIPELINE = (() => {
   }
 
   function qualityExamples() {
-    const failed = "Le mot est drole. C'est du pur brainrot. C'est chaotique.";
+    const failed = "Le mot est drole. C'est du pur brainrot.";
     const success =
-      "Banane laser debarque avec un grille-pain en feu sur une trottinette au plafond, et le feed panique. " +
-      "Elle reclame un autographe au lampadaire pendant qu'un pigeon en armure fait du drift sur la table. " +
-      "Puis un aquarium dans le bus passe en mode glitch et meme le frigo demande une truce. " +
-      "Dernier palier: la gravite depose sa demission et internet se met a genoux.";
+      "Banane laser sort du spawn avec un grille-pain en feu et une trottinette au plafond, feed en glitch. " +
+      "Le frigo applaudit pendant que le trottoir sprint en panique. " +
+      "Final: la gravite ragequit et internet se met a genoux.";
 
     return {
       failed: {

@@ -309,23 +309,55 @@ h1 {
 }
 
 .brainrot-item {
-  border: 1px solid #c7d2fe;
-  border-radius: 10px;
-  background: #ffffff;
-  padding: 8px;
+  border: 2px solid #c7d2fe;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #ffffff, #f5f8ff);
+  padding: 10px;
   display: grid;
-  gap: 4px;
+  gap: 8px;
   justify-items: center;
   text-align: center;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 .brainrot-clickable {
   cursor: zoom-in;
 }
 
-.brainrot-item img {
-  width: 42px;
-  height: 42px;
+.brainrot-stage {
+  width: 100%;
+  min-height: 94px;
+  border-radius: 12px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(148, 163, 184, 0.5);
+  background: radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.8), transparent 42%),
+    linear-gradient(140deg, hsl(var(--brainrot-hue, 42) 80% 90%), hsl(calc(var(--brainrot-hue, 42) + 24) 85% 76%));
+}
+
+.brainrot-stage img {
+  width: 76px;
+  height: 76px;
+  filter: drop-shadow(0 6px 12px rgba(15, 23, 42, 0.28));
+}
+
+.brainrot-stage.is-large {
+  min-height: 138px;
+}
+
+.brainrot-stage.is-large img {
+  width: 118px;
+  height: 118px;
+}
+
+.brainrot-emblem {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 1.05rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.35));
 }
 
 .rarity-chip {
@@ -335,19 +367,39 @@ h1 {
   font-weight: 800;
 }
 
-.rarity-common {
+.rarity-chip.rarity-common {
   background: #e2e8f0;
   color: #334155;
 }
 
-.rarity-rare {
+.rarity-chip.rarity-rare {
   background: #dbeafe;
   color: #1d4ed8;
 }
 
-.rarity-epic {
+.rarity-chip.rarity-epic {
   background: #fef3c7;
   color: #92400e;
+}
+
+.brainrot-item.rarity-common,
+.collect-card.rarity-common,
+.pack-card.rarity-common {
+  border-color: #94a3b8;
+}
+
+.brainrot-item.rarity-rare,
+.collect-card.rarity-rare,
+.pack-card.rarity-rare {
+  border-color: #2563eb;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+}
+
+.brainrot-item.rarity-epic,
+.collect-card.rarity-epic,
+.pack-card.rarity-epic {
+  border-color: #f59e0b;
+  box-shadow: 0 12px 30px rgba(245, 158, 11, 0.26);
 }
 
 .home-actions {
@@ -499,20 +551,16 @@ h1 {
 }
 
 .collect-card {
-  border-radius: 12px;
-  border: 1px solid #c7d2fe;
-  background: #ffffff;
-  min-height: 120px;
+  border-radius: 14px;
+  border: 2px solid #c7d2fe;
+  background: linear-gradient(160deg, #ffffff, #f8fbff);
+  min-height: 170px;
   display: grid;
   justify-items: center;
-  align-content: center;
-  padding: 8px;
+  align-content: start;
+  padding: 10px;
+  gap: 8px;
   text-align: center;
-}
-
-.collect-card img {
-  width: 64px;
-  height: 64px;
 }
 
 .collect-card.locked {
@@ -521,8 +569,9 @@ h1 {
 }
 
 .collect-title {
-  margin: 6px 0 2px;
+  margin: 2px 0 0;
   font-weight: 800;
+  font-size: 0.92rem;
 }
 
 .collect-meta {
@@ -758,18 +807,13 @@ h1 {
 }
 
 .pack-card {
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 10px;
   border: 2px solid #cbd5e1;
   display: grid;
   justify-items: center;
   text-align: center;
-  gap: 4px;
-}
-
-.pack-card img {
-  width: 74px;
-  height: 74px;
+  gap: 8px;
 }
 
 .pack-title {
@@ -827,8 +871,8 @@ h1 {
   position: relative;
   width: min(430px, 92vw);
   background: #ffffff;
-  border: 1px solid #c7d2fe;
-  border-radius: 16px;
+  border: 2px solid #c7d2fe;
+  border-radius: 18px;
   box-shadow: var(--shadow);
   padding: 14px;
   display: grid;
@@ -840,6 +884,14 @@ h1 {
 .brainrot-modal-card img {
   width: 124px;
   height: 124px;
+}
+
+#brainrotModalLine {
+  font-size: 0.96rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 2px;
+  line-height: 1.35;
 }
 
 button:focus-visible {

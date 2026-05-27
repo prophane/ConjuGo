@@ -83,7 +83,9 @@ const el = {
   brainrotModal: document.getElementById("brainrotModal"),
   brainrotModalBackdrop: document.getElementById("brainrotModalBackdrop"),
   brainrotModalClose: document.getElementById("brainrotModalClose"),
+  brainrotModalStage: document.getElementById("brainrotModalStage"),
   brainrotModalImage: document.getElementById("brainrotModalImage"),
+  brainrotModalEmblem: document.getElementById("brainrotModalEmblem"),
   brainrotModalTitle: document.getElementById("brainrotModalTitle"),
   brainrotModalMeta: document.getElementById("brainrotModalMeta"),
   brainrotModalLine: document.getElementById("brainrotModalLine"),
@@ -148,6 +150,36 @@ function applyCardVisual(img, card) {
   img.style.filter = `hue-rotate(${Number(card.hue || 0)}deg) saturate(${Number(card.sat || 1)})`;
 }
 
+function rarityClass(card) {
+  return `rarity-${String(card && card.rarity ? card.rarity : "common").toLowerCase()}`;
+}
+
+function cardTone(card) {
+  if (!card) {
+    return "0";
+  }
+  return String(Number(card.hue || 0));
+}
+
+function makeVisualStage(card, size = "normal") {
+  const stage = document.createElement("div");
+  stage.className = `brainrot-stage ${rarityClass(card)} ${size === "large" ? "is-large" : ""}`;
+  stage.style.setProperty("--brainrot-hue", cardTone(card));
+
+  const emblem = document.createElement("span");
+  emblem.className = "brainrot-emblem";
+  emblem.textContent = card.emblem || "⚡";
+
+  const img = document.createElement("img");
+  img.src = card.image;
+  img.alt = `Brainrot ${card.name}`;
+  applyCardVisual(img, card);
+
+  stage.appendChild(img);
+  stage.appendChild(emblem);
+  return stage;
+}
+
 function getCardById(cardId) {
   return CARD_DEFS.find((card) => card.id === cardId) || null;
 }
@@ -162,14 +194,22 @@ function openBrainrotModal(card) {
     el.brainrotModalImage.alt = `Brainrot ${card.name}`;
     applyCardVisual(el.brainrotModalImage, card);
   }
+  if (el.brainrotModalEmblem) {
+    el.brainrotModalEmblem.textContent = card.emblem || "⚡";
+  }
   if (el.brainrotModalTitle) {
     el.brainrotModalTitle.textContent = card.name;
   }
   if (el.brainrotModalMeta) {
-    el.brainrotModalMeta.textContent = `${card.rarity} · ${card.family || "Brainrot"}`;
+    el.brainrotModalMeta.textContent = `${card.rarity} · ${card.family || "Brainrot"} · Q${Number(card.quality || 0)}`;
   }
   if (el.brainrotModalLine) {
     el.brainrotModalLine.textContent = card.line || "";
+  }
+
+  if (el.brainrotModalStage) {
+    el.brainrotModalStage.className = `brainrot-stage is-large ${rarityClass(card)}`;
+    el.brainrotModalStage.style.setProperty("--brainrot-hue", cardTone(card));
   }
 
   el.brainrotModal.hidden = false;
@@ -631,13 +671,11 @@ function renderAdminBrainrotCatalog() {
     rarityCounts[card.rarity] = Number(rarityCounts[card.rarity] || 0) + 1;
 
     const item = document.createElement("article");
-    item.className = "brainrot-item brainrot-clickable";
+    item.className = `brainrot-item brainrot-clickable ${rarityClass(card)}`;
     item.dataset.cardId = card.id;
+    item.style.setProperty("--brainrot-hue", cardTone(card));
 
-    const img = document.createElement("img");
-    img.src = card.image;
-    img.alt = `Brainrot ${card.name}`;
-    applyCardVisual(img, card);
+    const stage = makeVisualStage(card);
 
     const title = document.createElement("strong");
     title.textContent = card.name;
@@ -650,7 +688,7 @@ function renderAdminBrainrotCatalog() {
     family.className = "collect-meta";
     family.textContent = card.family || "Brainrot";
 
-    item.appendChild(img);
+    item.appendChild(stage);
     item.appendChild(title);
     item.appendChild(rarity);
     item.appendChild(family);
@@ -953,13 +991,11 @@ function renderProgressPanel() {
     unlockedCards.forEach((card) => {
       const count = Number(state.progress.collection[card.id] || 0);
       const article = document.createElement("article");
-      article.className = "collect-card unlocked brainrot-clickable";
+      article.className = `collect-card unlocked brainrot-clickable ${rarityClass(card)}`;
       article.dataset.cardId = card.id;
+      article.style.setProperty("--brainrot-hue", cardTone(card));
 
-      const img = document.createElement("img");
-      img.src = card.image;
-      img.alt = `Sticker ${card.name}`;
-      applyCardVisual(img, card);
+      const stage = makeVisualStage(card);
 
       const title = document.createElement("p");
       title.className = "collect-title";
@@ -967,9 +1003,9 @@ function renderProgressPanel() {
 
       const meta = document.createElement("p");
       meta.className = "collect-meta";
-      meta.textContent = `${card.rarity} · ${card.family || "Brainrot"} · x${count}`;
+      meta.textContent = `${card.rarity} · x${count}`;
 
-      article.appendChild(img);
+      article.appendChild(stage);
       article.appendChild(title);
       article.appendChild(meta);
       el.collectionGrid.appendChild(article);
@@ -1098,13 +1134,11 @@ function renderSessionRewards() {
     if (state.sessionReward.card) {
       const card = state.sessionReward.card;
       const cardEl = document.createElement("article");
-      cardEl.className = `pack-card rarity-${card.rarity.toLowerCase()} brainrot-clickable`;
+      cardEl.className = `pack-card ${rarityClass(card)} brainrot-clickable`;
       cardEl.dataset.cardId = card.id;
+      cardEl.style.setProperty("--brainrot-hue", cardTone(card));
 
-      const img = document.createElement("img");
-      img.src = card.image;
-      img.alt = `Carte ${card.name}`;
-      applyCardVisual(img, card);
+      const stage = makeVisualStage(card, "large");
 
       const title = document.createElement("p");
       title.className = "pack-title";
@@ -1115,7 +1149,7 @@ function renderSessionRewards() {
       const fresh = state.sessionReward.wasNewCard ? "NOUVELLE" : "Doublon";
       meta.textContent = `${card.rarity} · ${fresh}`;
 
-      cardEl.appendChild(img);
+      cardEl.appendChild(stage);
       cardEl.appendChild(title);
       cardEl.appendChild(meta);
       el.rewardCard.appendChild(cardEl);
