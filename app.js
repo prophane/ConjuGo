@@ -8,7 +8,7 @@ const FAMILY_KEY = "conjugo-family-v1";
 const FAMILY_SERVER_CACHE_KEY = "conjugo-family-server-cache-v1";
 const FAMILY_API_ENDPOINT = "/api/family-state";
 const APP_VERSION = "v2026.05.27.1";
-const STICKER_CATALOG_SIZE = 500;
+const STICKER_CATALOG_SIZE = 30;
 
 const STICKER_SOURCES = [
   "./stickers/brainy-rocket.svg",
@@ -161,10 +161,22 @@ function cardTone(card) {
   return String(Number(card.hue || 0));
 }
 
+function cardAccent(card) {
+  if (!card) {
+    return "0";
+  }
+  return String(Number(card.accent || 0));
+}
+
+function cardMotif(card) {
+  return `motif-${String(card && card.motif ? card.motif : "spark")}`;
+}
+
 function makeVisualStage(card, size = "normal") {
   const stage = document.createElement("div");
-  stage.className = `brainrot-stage ${rarityClass(card)} ${size === "large" ? "is-large" : ""}`;
+  stage.className = `brainrot-stage ${rarityClass(card)} ${cardMotif(card)} ${size === "large" ? "is-large" : ""}`;
   stage.style.setProperty("--brainrot-hue", cardTone(card));
+  stage.style.setProperty("--brainrot-accent", cardAccent(card));
 
   const emblem = document.createElement("span");
   emblem.className = "brainrot-emblem";
@@ -208,8 +220,9 @@ function openBrainrotModal(card) {
   }
 
   if (el.brainrotModalStage) {
-    el.brainrotModalStage.className = `brainrot-stage is-large ${rarityClass(card)}`;
+    el.brainrotModalStage.className = `brainrot-stage is-large ${rarityClass(card)} ${cardMotif(card)}`;
     el.brainrotModalStage.style.setProperty("--brainrot-hue", cardTone(card));
+    el.brainrotModalStage.style.setProperty("--brainrot-accent", cardAccent(card));
   }
 
   el.brainrotModal.hidden = false;
@@ -674,6 +687,7 @@ function renderAdminBrainrotCatalog() {
     item.className = `brainrot-item brainrot-clickable ${rarityClass(card)}`;
     item.dataset.cardId = card.id;
     item.style.setProperty("--brainrot-hue", cardTone(card));
+    item.style.setProperty("--brainrot-accent", cardAccent(card));
 
     const stage = makeVisualStage(card);
 
@@ -994,6 +1008,7 @@ function renderProgressPanel() {
       article.className = `collect-card unlocked brainrot-clickable ${rarityClass(card)}`;
       article.dataset.cardId = card.id;
       article.style.setProperty("--brainrot-hue", cardTone(card));
+      article.style.setProperty("--brainrot-accent", cardAccent(card));
 
       const stage = makeVisualStage(card);
 
@@ -1137,6 +1152,7 @@ function renderSessionRewards() {
       cardEl.className = `pack-card ${rarityClass(card)} brainrot-clickable`;
       cardEl.dataset.cardId = card.id;
       cardEl.style.setProperty("--brainrot-hue", cardTone(card));
+      cardEl.style.setProperty("--brainrot-accent", cardAccent(card));
 
       const stage = makeVisualStage(card, "large");
 

@@ -43,7 +43,7 @@ Le mode de base fonctionne sans backend metier. Cette version inclut en plus une
 - Boutons Rejouer et Changer la selection
 - Suivi local: sessions, precision, meilleur score, pieces
 - Recompenses: badges debloques automatiquement
-- Collection brainrot (500 stickers) avec progression rapide et constante
+- Collection brainrot curatee (30 stickers premium) avec progression qualitative
 - Stickers affiches uniquement quand debloques (pas de grille grisee)
 - Pack de recompense en fin de session (priorite aux nouveaux stickers)
 - Page Progression: niveau, xp, badges, collection debloquee
@@ -125,7 +125,7 @@ Composants:
 - generateBrainrot(input, style): generation de base
 - scoreBrainrot(output): scoring silencieux (0-100)
 - generateWithQuality(...): regeneration si score trop bas
-- buildBrainrotCatalog(...): creation du catalogue final de 500 brainrots
+- buildBrainrotCatalog(...): creation du catalogue final de 30 brainrots curates
 
 Critiques qualite appliquees:
 
