@@ -813,6 +813,10 @@ h1 {
   place-items: center;
 }
 
+.brainrot-modal[hidden] {
+  display: none;
+}
+
 .brainrot-modal-backdrop {
   position: absolute;
   inset: 0;
