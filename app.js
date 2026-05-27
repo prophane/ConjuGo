@@ -84,6 +84,7 @@ const el = {
   brainrotModal: document.getElementById("brainrotModal"),
   brainrotModalBackdrop: document.getElementById("brainrotModalBackdrop"),
   brainrotModalClose: document.getElementById("brainrotModalClose"),
+  brainrotModalSaveBtn: document.getElementById("brainrotModalSaveBtn"),
   brainrotModalStage: document.getElementById("brainrotModalStage"),
   brainrotModalImage: document.getElementById("brainrotModalImage"),
   brainrotModalEmblem: document.getElementById("brainrotModalEmblem"),
@@ -202,6 +203,55 @@ function getCardById(cardId) {
   return CARD_DEFS.find((card) => card.id === cardId) || null;
 }
 
+function slugifyCardName(name) {
+  return String(name || "brainrot")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "brainrot";
+}
+
+function extensionFromImageSource(src) {
+  const source = String(src || "").toLowerCase();
+  if (source.startsWith("data:image/svg+xml")) {
+    return "svg";
+  }
+  if (source.startsWith("data:image/png")) {
+    return "png";
+  }
+  if (source.startsWith("data:image/webp")) {
+    return "webp";
+  }
+  if (source.startsWith("data:image/jpeg") || source.startsWith("data:image/jpg")) {
+    return "jpg";
+  }
+
+  const dotIndex = source.lastIndexOf(".");
+  if (dotIndex === -1) {
+    return "svg";
+  }
+
+  const ext = source.slice(dotIndex + 1).split("?")[0].split("#")[0];
+  return ext || "svg";
+}
+
+function downloadCardImage(card) {
+  if (!card || !card.image) {
+    return;
+  }
+
+  const extension = extensionFromImageSource(card.image);
+  const filename = `${slugifyCardName(card.name)}.${extension}`;
+  const link = document.createElement("a");
+  link.href = card.image;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function openBrainrotModal(card) {
   if (!card || !el.brainrotModal) {
     return;
@@ -231,6 +281,8 @@ function openBrainrotModal(card) {
     el.brainrotModalStage.style.setProperty("--brainrot-accent", cardAccent(card));
   }
 
+  el.brainrotModal.dataset.cardId = card.id;
+
   el.brainrotModal.hidden = false;
 }
 
@@ -238,7 +290,22 @@ function closeBrainrotModal() {
   if (!el.brainrotModal) {
     return;
   }
+  delete el.brainrotModal.dataset.cardId;
   el.brainrotModal.hidden = true;
+}
+
+function handleSaveBrainrotImage() {
+  if (!el.brainrotModal) {
+    return;
+  }
+
+  const cardId = el.brainrotModal.dataset.cardId;
+  const card = getCardById(cardId);
+  if (!card) {
+    return;
+  }
+
+  downloadCardImage(card);
 }
 
 function handleBrainrotClick(event) {
@@ -1904,6 +1971,9 @@ function bindEvents() {
   }
   if (el.brainrotModalClose) {
     el.brainrotModalClose.addEventListener("click", closeBrainrotModal);
+  }
+  if (el.brainrotModalSaveBtn) {
+    el.brainrotModalSaveBtn.addEventListener("click", handleSaveBrainrotImage);
   }
   if (el.brainrotModalBackdrop) {
     el.brainrotModalBackdrop.addEventListener("click", closeBrainrotModal);

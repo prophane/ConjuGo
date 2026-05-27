@@ -880,6 +880,17 @@ h1 {
   text-align: center;
 }
 
+.brainrot-modal-actions {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.brainrot-modal-actions .mini-btn {
+  flex: 1;
+}
+
 #brainrotModalMeta {
   font-weight: 800;
   color: #1e3a8a;
