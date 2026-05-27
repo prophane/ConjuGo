@@ -80,6 +80,13 @@ const el = {
   adminBrainrotPanel: document.getElementById("adminBrainrotPanel"),
   brainrotCountLine: document.getElementById("brainrotCountLine"),
   adminBrainrotGrid: document.getElementById("adminBrainrotGrid"),
+  brainrotModal: document.getElementById("brainrotModal"),
+  brainrotModalBackdrop: document.getElementById("brainrotModalBackdrop"),
+  brainrotModalClose: document.getElementById("brainrotModalClose"),
+  brainrotModalImage: document.getElementById("brainrotModalImage"),
+  brainrotModalTitle: document.getElementById("brainrotModalTitle"),
+  brainrotModalMeta: document.getElementById("brainrotModalMeta"),
+  brainrotModalLine: document.getElementById("brainrotModalLine"),
   addChildForm: document.getElementById("addChildForm"),
   childNameInput: document.getElementById("childNameInput"),
   childPinInput: document.getElementById("childPinInput"),
@@ -139,6 +146,54 @@ function applyCardVisual(img, card) {
   }
 
   img.style.filter = `hue-rotate(${Number(card.hue || 0)}deg) saturate(${Number(card.sat || 1)})`;
+}
+
+function getCardById(cardId) {
+  return CARD_DEFS.find((card) => card.id === cardId) || null;
+}
+
+function openBrainrotModal(card) {
+  if (!card || !el.brainrotModal) {
+    return;
+  }
+
+  if (el.brainrotModalImage) {
+    el.brainrotModalImage.src = card.image;
+    el.brainrotModalImage.alt = `Brainrot ${card.name}`;
+    applyCardVisual(el.brainrotModalImage, card);
+  }
+  if (el.brainrotModalTitle) {
+    el.brainrotModalTitle.textContent = card.name;
+  }
+  if (el.brainrotModalMeta) {
+    el.brainrotModalMeta.textContent = `${card.rarity} · ${card.family || "Brainrot"}`;
+  }
+  if (el.brainrotModalLine) {
+    el.brainrotModalLine.textContent = card.line || "";
+  }
+
+  el.brainrotModal.hidden = false;
+}
+
+function closeBrainrotModal() {
+  if (!el.brainrotModal) {
+    return;
+  }
+  el.brainrotModal.hidden = true;
+}
+
+function handleBrainrotClick(event) {
+  const target = event.target.closest("[data-card-id]");
+  if (!target) {
+    return;
+  }
+
+  const card = getCardById(target.dataset.cardId);
+  if (!card) {
+    return;
+  }
+
+  openBrainrotModal(card);
 }
 
 function getUnlockedCount(progress) {
@@ -576,7 +631,8 @@ function renderAdminBrainrotCatalog() {
     rarityCounts[card.rarity] = Number(rarityCounts[card.rarity] || 0) + 1;
 
     const item = document.createElement("article");
-    item.className = "brainrot-item";
+    item.className = "brainrot-item brainrot-clickable";
+    item.dataset.cardId = card.id;
 
     const img = document.createElement("img");
     img.src = card.image;
@@ -897,7 +953,8 @@ function renderProgressPanel() {
     unlockedCards.forEach((card) => {
       const count = Number(state.progress.collection[card.id] || 0);
       const article = document.createElement("article");
-      article.className = "collect-card unlocked";
+      article.className = "collect-card unlocked brainrot-clickable";
+      article.dataset.cardId = card.id;
 
       const img = document.createElement("img");
       img.src = card.image;
@@ -1041,7 +1098,8 @@ function renderSessionRewards() {
     if (state.sessionReward.card) {
       const card = state.sessionReward.card;
       const cardEl = document.createElement("article");
-      cardEl.className = `pack-card rarity-${card.rarity.toLowerCase()}`;
+      cardEl.className = `pack-card rarity-${card.rarity.toLowerCase()} brainrot-clickable`;
+      cardEl.dataset.cardId = card.id;
 
       const img = document.createElement("img");
       img.src = card.image;
@@ -1675,6 +1733,21 @@ function bindEvents() {
   if (el.adminBrainrotTab) {
     el.adminBrainrotTab.addEventListener("click", handleAdminBrainrotTab);
   }
+  if (el.collectionGrid) {
+    el.collectionGrid.addEventListener("click", handleBrainrotClick);
+  }
+  if (el.adminBrainrotGrid) {
+    el.adminBrainrotGrid.addEventListener("click", handleBrainrotClick);
+  }
+  if (el.rewardCard) {
+    el.rewardCard.addEventListener("click", handleBrainrotClick);
+  }
+  if (el.brainrotModalClose) {
+    el.brainrotModalClose.addEventListener("click", closeBrainrotModal);
+  }
+  if (el.brainrotModalBackdrop) {
+    el.brainrotModalBackdrop.addEventListener("click", closeBrainrotModal);
+  }
   el.startBtn.addEventListener("click", startSession);
   el.progressBtn.addEventListener("click", navigateToProgress);
   el.backTrainingBtn.addEventListener("click", backToTraining);
@@ -1683,6 +1756,10 @@ function bindEvents() {
   el.replayBtn.addEventListener("click", startSession);
   el.backConfigBtn.addEventListener("click", backToConfig);
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && el.brainrotModal && !el.brainrotModal.hidden) {
+      closeBrainrotModal();
+      return;
+    }
     if (event.altKey && event.shiftKey && event.key.toLowerCase() === "p") {
       handleParentMode();
       return;
