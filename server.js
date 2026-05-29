@@ -146,6 +146,65 @@ function normalizeEmail(value) {
   return value.trim().toLowerCase();
 }
 
+function getCanonicalUserKey(user) {
+  if (!user || typeof user !== "object") {
+    return "";
+  }
+
+  const email = normalizeEmail(user.email);
+  if (email) {
+    return `email:${email}`;
+  }
+
+  const providerSubject = String(user.providerSubject || "").trim();
+  if (providerSubject) {
+    return `subject:${providerSubject}`;
+  }
+
+  const id = String(user.id || "").trim();
+  return id ? `id:${id}` : "";
+}
+
+function dedupeKnownUsers(users) {
+  const byKey = new Map();
+
+  users.forEach((entry) => {
+    if (!entry || typeof entry !== "object") {
+      return;
+    }
+
+    const key = getCanonicalUserKey(entry);
+    if (!key) {
+      return;
+    }
+
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { ...entry, email: normalizeEmail(entry.email) });
+      return;
+    }
+
+    const existingLastSeen = String(existing.lastSeenAt || "");
+    const nextLastSeen = String(entry.lastSeenAt || "");
+    const preferred = nextLastSeen.localeCompare(existingLastSeen) > 0 ? entry : existing;
+    const merged = {
+      ...existing,
+      ...preferred,
+      id: existing.id || entry.id || "",
+      email: normalizeEmail(existing.email || entry.email),
+      providerSubject: existing.providerSubject || entry.providerSubject || "",
+      displayName: preferred.displayName || existing.displayName || entry.displayName || "",
+      createdAt: existing.createdAt || entry.createdAt || "",
+      lastSeenAt: nextLastSeen.localeCompare(existingLastSeen) > 0 ? entry.lastSeenAt || existing.lastSeenAt || "" : existing.lastSeenAt || entry.lastSeenAt || "",
+      source: existing.source || entry.source || ""
+    };
+
+    byKey.set(key, merged);
+  });
+
+  return Array.from(byKey.values());
+}
+
 function getHeader(request, name) {
   const value = request.headers[name];
   if (Array.isArray(value)) {
@@ -198,12 +257,14 @@ function upsertUserFromHeaders(request) {
     store.users = [];
   }
 
+  store.users = dedupeKnownUsers(store.users);
+
   const now = new Date().toISOString();
   let user = store.users.find((entry) => {
-    if (providerSubject && entry.providerSubject === providerSubject) {
+    if (email && entry.email === email) {
       return true;
     }
-    if (email && entry.email === email) {
+    if (providerSubject && entry.providerSubject === providerSubject) {
       return true;
     }
     return false;
@@ -240,7 +301,13 @@ function upsertUserFromHeaders(request) {
 
 function listKnownUsers() {
   const store = safeReadJson(USER_DB_FILE);
-  const users = Array.isArray(store.users) ? store.users : [];
+  const users = dedupeKnownUsers(Array.isArray(store.users) ? store.users : []);
+
+  if (!Array.isArray(store.users) || store.users.length !== users.length) {
+    store.users = users;
+    safeWriteJson(USER_DB_FILE, store);
+  }
+
   return users
     .map((entry) => ({
       id: entry.id || "",

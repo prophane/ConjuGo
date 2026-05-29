@@ -417,14 +417,14 @@ function getUserAccountId(user) {
     return "";
   }
 
-  return String(user.id || user.email || user.providerSubject || "").trim();
+  return String(user.email || user.providerSubject || user.id || "").trim();
 }
 
 function getAccountIdFromUserRecord(userRecord) {
   if (!userRecord || typeof userRecord !== "object") {
     return "";
   }
-  return String(userRecord.providerSubject || userRecord.email || userRecord.id || "").trim();
+  return String(userRecord.email || userRecord.providerSubject || userRecord.id || "").trim();
 }
 
 function getChildDisplayName(child) {
