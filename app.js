@@ -39,28 +39,73 @@ const LEVEL_LABELS = [
   "Boss des verbes"
 ];
 
-const FUNNY_ETRE_TEMPLATES = [
-  "Dans le dojo des etoiles, {pronounBlank} ({verb}) en forme olympique.",
-  "A la fete des robots, {pronounBlank} ({verb}) au top aujourd'hui.",
-  "Sur la planete des licornes, {pronounBlank} ({verb}) dans la lune mais efficaces.",
-  "Dans le bus volant, {pronounBlank} ({verb}) en mission secrete.",
-  "Au stade des pingouins, {pronounBlank} ({verb}) au rendez-vous."
-];
+const FUNNY_TEMPLATES_BY_VERB = {
+  etre: [
+    "Avant la mission, {pronounBlank} ({verb}) de bonne humeur.",
+    "Pendant le cours magique, {pronounBlank} ({verb}) toujours en avance.",
+    "Au club des robots, {pronounBlank} ({verb}) au rendez-vous."
+  ],
+  avoir: [
+    "Pour la mission du jour, {pronounBlank} ({verb}) une idee brillante.",
+    "A la fete de l'ecole, {pronounBlank} ({verb}) un costume rigolo.",
+    "Dans le labo secret, {pronounBlank} ({verb}) une lampe arc-en-ciel."
+  ],
+  manger: [
+    "A la cantine de l'espace, {pronounBlank} ({verb}) une pizza cosmique.",
+    "Pendant le picnic geant, {pronounBlank} ({verb}) un sandwich geant.",
+    "Au parc des dragons, {pronounBlank} ({verb}) une glace bleue."
+  ],
+  jouer: [
+    "Dans la cour de recreation, {pronounBlank} ({verb}) au ballon.",
+    "Au stade des pingouins, {pronounBlank} ({verb}) avec l'equipe.",
+    "A la fete du village, {pronounBlank} ({verb}) a cache-cache."
+  ],
+  parler: [
+    "En classe, {pronounBlank} ({verb}) au micro de la radio.",
+    "Au conseil des heros, {pronounBlank} ({verb}) avec assurance.",
+    "Pendant la reunion, {pronounBlank} ({verb}) calmement."
+  ],
+  aimer: [
+    "Dans la bibliotheque magique, {pronounBlank} ({verb}) les histoires droles.",
+    "A la maison, {pronounBlank} ({verb}) les jeux de mots.",
+    "Pendant la fete, {pronounBlank} ({verb}) les chansons rigolotes."
+  ],
+  finir: [
+    "En etude, {pronounBlank} ({verb}) l'exercice avant la cloche.",
+    "Dans le labo, {pronounBlank} ({verb}) le puzzle geant.",
+    "Avant la recre, {pronounBlank} ({verb}) le devoir."
+  ],
+  choisir: [
+    "Dans le coffre magique, {pronounBlank} ({verb}) la bonne cle.",
+    "Au jeu des cartes, {pronounBlank} ({verb}) la meilleure option.",
+    "Pendant la mission, {pronounBlank} ({verb}) le bon chemin."
+  ],
+  aller: [
+    "Chaque matin, {pronounBlank} ({verb}) a l'ecole en chanson.",
+    "Pour la mission, {pronounBlank} ({verb}) au laboratoire secret.",
+    "Apres le cours, {pronounBlank} ({verb}) a la bibliotheque."
+  ],
+  faire: [
+    "En atelier, {pronounBlank} ({verb}) un dessin geant.",
+    "Pour la fete, {pronounBlank} ({verb}) un gateau imaginaire.",
+    "En equipe, {pronounBlank} ({verb}) un plan parfait."
+  ],
+  venir: [
+    "Pour la reunion, {pronounBlank} ({verb}) avec le sourire.",
+    "A la fete de l'ecole, {pronounBlank} ({verb}) en avance.",
+    "Dans le labo secret, {pronounBlank} ({verb}) pour aider l'equipe."
+  ],
+  prendre: [
+    "Avant la course, {pronounBlank} ({verb}) le bus volant.",
+    "En classe, {pronounBlank} ({verb}) le cahier bleu.",
+    "Pour la mission, {pronounBlank} ({verb}) la bonne direction."
+  ]
+};
 
-const FUNNY_AVOIR_TEMPLATES = [
-  "Dans la cuisine de l'espace, {pronounBlank} ({verb}) une louche magique.",
-  "Au cinema des licornes, {pronounBlank} ({verb}) du pop-corn geant.",
-  "Sur la lune en bonbons, {pronounBlank} ({verb}) un skate antigravite.",
-  "Au stade des pingouins, {pronounBlank} ({verb}) des baskets turbo.",
-  "Dans le chateau en carton, {pronounBlank} ({verb}) une carte au tresor."
-];
-
-const FUNNY_GENERIC_TEMPLATES = [
-  "Dans la cour des dragons, {pronounBlank} ({verb}) en mode turbo.",
-  "Sur une scene disco, {pronounBlank} ({verb}) comme des super-heros.",
-  "Dans la ville des robots, {pronounBlank} ({verb}) sans perdre le sourire.",
-  "Au sommet d'un nuage geant, {pronounBlank} ({verb}) avec style.",
-  "Dans le laboratoire secret, {pronounBlank} ({verb}) comme des champions."
+const FUNNY_FALLBACK_TEMPLATES = [
+  "Pendant la mission du jour, {pronounBlank} ({verb}) avec concentration.",
+  "En classe, {pronounBlank} ({verb}) sans se tromper.",
+  "A la fete de l'ecole, {pronounBlank} ({verb}) avec le sourire."
 ];
 
 const FUNNY_SUCCESS_LINES = [
@@ -1888,11 +1933,7 @@ function randomFromList(list) {
 
 function buildFunnyQuestionPrompt(question) {
   const infinitive = String(question && question.verb ? question.verb : "").trim().toLowerCase();
-  const templates = infinitive === "etre"
-    ? FUNNY_ETRE_TEMPLATES
-    : infinitive === "avoir"
-      ? FUNNY_AVOIR_TEMPLATES
-      : FUNNY_GENERIC_TEMPLATES;
+  const templates = FUNNY_TEMPLATES_BY_VERB[infinitive] || FUNNY_FALLBACK_TEMPLATES;
 
   const template = randomFromList(templates);
   if (!template) {
