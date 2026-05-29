@@ -39,6 +39,29 @@ const LEVEL_LABELS = [
   "Boss des verbes"
 ];
 
+const FUNNY_QUESTION_TEMPLATES = [
+  "Dans la cuisine de l'espace, {pronounBlank} ({verb}) une soupe arc-en-ciel.",
+  "Au stade des pingouins, {pronounBlank} ({verb}) avec des chaussures a ressorts.",
+  "Dans un chateau en carton, {pronounBlank} ({verb}) avec un dragon qui rigole.",
+  "Sur une planete en bonbons, {pronounBlank} ({verb}) pendant qu'il pleut des confettis.",
+  "Au cinema des licornes, {pronounBlank} ({verb}) en mangeant du pop-corn geant.",
+  "Dans un bus volant, {pronounBlank} ({verb}) en pyjama de super-heros."
+];
+
+const FUNNY_SUCCESS_LINES = [
+  "Parfait, les licornes valident.",
+  "Excellent, mission turbo reussie.",
+  "Bien joue, les pingouins applaudissent.",
+  "Top, le dragon dit bravo."
+];
+
+const FUNNY_RETRY_LINES = [
+  "Pas grave, on relance la fusee.",
+  "Ce n'est pas loin, on continue.",
+  "Presque, les pingouins t'encouragent.",
+  "On y est presque, prochain coup c'est bon."
+];
+
 const state = {
   selected: new Set(),
   questions: [],
@@ -1841,6 +1864,24 @@ function randomMascotMessage() {
   return lines[Math.floor(Math.random() * lines.length)];
 }
 
+function randomFromList(list) {
+  if (!Array.isArray(list) || !list.length) {
+    return "";
+  }
+  return list[Math.floor(Math.random() * list.length)] || "";
+}
+
+function buildFunnyQuestionPrompt(question) {
+  const template = randomFromList(FUNNY_QUESTION_TEMPLATES);
+  if (!template) {
+    return `Complete: ${getPromptPronoun(question)} ___ (${question.verb})`;
+  }
+
+  const pronoun = getPromptPronoun(question);
+  const pronounBlank = `${pronoun}${pronoun.endsWith("'") ? "" : " "}___`;
+  return template.replace("{pronounBlank}", pronounBlank).replace("{verb}", question.verb);
+}
+
 function setRandomMascot() {
   if (el.mascotImage) {
     const src = STICKER_SOURCES[Math.floor(Math.random() * STICKER_SOURCES.length)];
@@ -2067,7 +2108,7 @@ function renderQuestion() {
 
   el.pronounBadge.textContent = question.pronounLabel;
   el.verbLabel.textContent = question.verb;
-  el.questionExplain.textContent = `Complete: ${getPromptPronoun(question)} ___ (${question.verb})`;
+  el.questionExplain.textContent = buildFunnyQuestionPrompt(question);
 
   el.feedback.hidden = true;
   el.feedbackText.textContent = "";
@@ -2107,7 +2148,7 @@ function validateAnswer(selectedText, clickedButton) {
 
   if (ok) {
     state.score += 1;
-    el.feedbackText.textContent = `Super! ${formatFullAnswer(question, correctForm)}.`;
+    el.feedbackText.textContent = `Super! ${formatFullAnswer(question, correctForm)}. ${randomFromList(FUNNY_SUCCESS_LINES)}`;
     triggerRewardAnimation();
   } else {
     state.errors.push({
@@ -2116,7 +2157,7 @@ function validateAnswer(selectedText, clickedButton) {
       expected: formatFullAnswer(question, correctForm),
       selected: selectedText
     });
-    el.feedbackText.textContent = `Presque! La bonne phrase: ${formatFullAnswer(question, correctForm)}.`;
+    el.feedbackText.textContent = `Presque! La bonne phrase: ${formatFullAnswer(question, correctForm)}. ${randomFromList(FUNNY_RETRY_LINES)}`;
   }
 
   el.feedback.hidden = false;
