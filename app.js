@@ -117,6 +117,24 @@ const FUNNY_FALLBACK_TEMPLATES = [
   "A la fete de l'ecole, {pronounBlank} ({verb}) avec le sourire."
 ];
 
+const TENSE_PROMPT_TEMPLATES = {
+  present: [
+    "Aujourd'hui, {pronounBlank} ({verb}) avec confiance.",
+    "Maintenant, {pronounBlank} ({verb}) en equipe.",
+    "En ce moment, {pronounBlank} ({verb}) tres bien."
+  ],
+  futur: [
+    "Demain, {pronounBlank} ({verb}) avec energie.",
+    "Bientot, {pronounBlank} ({verb}) en mission speciale.",
+    "La semaine prochaine, {pronounBlank} ({verb}) au top."
+  ],
+  passeCompose: [
+    "Hier, {pronounBlank} ({verb}) avec succes.",
+    "Ce matin, {pronounBlank} ({verb}) sans erreur.",
+    "Tout a l'heure, {pronounBlank} ({verb}) tres vite."
+  ]
+};
+
 const FUNNY_SUCCESS_LINES = [
   "Parfait, les licornes valident.",
   "Excellent, mission turbo reussie.",
@@ -2004,7 +2022,10 @@ function randomFromList(list) {
 
 function buildFunnyQuestionPrompt(question) {
   const infinitive = String(question && question.verb ? question.verb : "").trim().toLowerCase();
-  const templates = FUNNY_TEMPLATES_BY_VERB[infinitive] || FUNNY_FALLBACK_TEMPLATES;
+  const tenseKey = String(question && question.tenseKey ? question.tenseKey : "present");
+  const templates = tenseKey === "present"
+    ? (FUNNY_TEMPLATES_BY_VERB[infinitive] || FUNNY_FALLBACK_TEMPLATES)
+    : (TENSE_PROMPT_TEMPLATES[tenseKey] || TENSE_PROMPT_TEMPLATES.present);
 
   const template = randomFromList(templates);
   if (!template) {
@@ -2345,7 +2366,10 @@ function renderQuestion() {
 
   const isTypedQuestion = question.responseMode === "typed";
   if (el.sessionModeHint) {
-    el.sessionModeHint.textContent = isTypedQuestion ? "Ecris la bonne forme." : "Choisis le bon mot.";
+    const tenseLabel = question.tenseLabel ? question.tenseLabel.toLowerCase() : "temps choisi";
+    el.sessionModeHint.textContent = isTypedQuestion
+      ? `Ecris la bonne forme (${tenseLabel}).`
+      : `Choisis la bonne forme (${tenseLabel}).`;
   }
   const typedTotal = state.questions.filter((entry) => entry.responseMode === "typed").length;
   const typedDone = state.questions
