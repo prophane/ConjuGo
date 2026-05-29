@@ -8,7 +8,6 @@ const FAMILY_KEY = "conjugo-family-v1";
 const FAMILY_SERVER_CACHE_KEY = "conjugo-family-server-cache-v1";
 const FAMILY_API_ENDPOINT = "/api/family-state";
 const USERS_API_ENDPOINT = "/api/users";
-const LOGOUT_API_ENDPOINT = "/api/logout";
 const APP_VERSION = "v2026.05.27.1";
 const STICKER_CATALOG_SIZE = 30;
 const SELF_SELECTION_ID = "__self__";
@@ -77,8 +76,6 @@ const el = {
   activeChildSelect: document.getElementById("activeChildSelect"),
   parentModeBtn: document.getElementById("parentModeBtn"),
   leaveParentModeBtn: document.getElementById("leaveParentModeBtn"),
-  refreshIdentityBtn: document.getElementById("refreshIdentityBtn"),
-  logoutBtn: document.getElementById("logoutBtn"),
   openAdminBtn: document.getElementById("openAdminBtn"),
   progressChildLine: document.getElementById("progressChildLine"),
   parentAdminPanel: document.getElementById("parentAdminPanel"),
@@ -754,6 +751,24 @@ async function handleAccountUsersClick(event) {
     return;
   }
 
+  const existingChild = findChildByName(enteredName);
+  if (existingChild) {
+    const existingAccountId = String(existingChild.accountId || "").trim();
+    if (existingAccountId && existingAccountId !== accountId) {
+      showAdminMessage(`Le profil ${getChildDisplayName(existingChild)} est deja lie a un autre compte.`);
+      return;
+    }
+
+    existingChild.accountId = accountId;
+    existingChild.pin = pin || existingChild.pin;
+    saveFamily();
+    saveProgress();
+    renderFamilyUI();
+    renderProgressPanel();
+    showAdminMessage(`Compte rattache au profil existant: ${getChildDisplayName(existingChild)}.`);
+    return;
+  }
+
   const child = {
     id: makeChildId(),
     name: enteredName,
@@ -834,68 +849,6 @@ async function loadConnectedUser() {
   } catch (_error) {
     // Front remains usable even if backend user API is unavailable.
   }
-}
-
-async function requestLogoutInfo() {
-  try {
-    const response = await fetch(LOGOUT_API_ENDPOINT, {
-      method: "POST",
-      cache: "no-store"
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      return { ok: false, logoutUrl: "" };
-    }
-    return {
-      ok: true,
-      logoutUrl: String(payload.logoutUrl || "").trim()
-    };
-  } catch (_error) {
-    return { ok: false, logoutUrl: "" };
-  }
-}
-
-function clearLocalIdentityState() {
-  localStorage.removeItem(FAMILY_KEY);
-  localStorage.removeItem(PROGRESS_KEY);
-  localStorage.removeItem(FAMILY_SERVER_CACHE_KEY);
-  state.isParentMode = false;
-  state.user = null;
-}
-
-async function handleRefreshIdentity() {
-  const previousAccountId = getUserAccountId(state.user);
-  await loadConnectedUser();
-  const nextAccountId = getUserAccountId(state.user);
-
-  if (!nextAccountId) {
-    showAdminMessage("Identite introuvable. Verifie la session SSO.");
-    return;
-  }
-
-  if (previousAccountId && previousAccountId !== nextAccountId) {
-    showAdminMessage("Changement de compte detecte. Pense a verifier le profil actif.");
-    return;
-  }
-
-  showAdminMessage("Compte recharge.");
-}
-
-async function handleLogout() {
-  const confirmed = window.confirm("Se deconnecter de Conjugo sur cet appareil ?");
-  if (!confirmed) {
-    return;
-  }
-
-  const logoutInfo = await requestLogoutInfo();
-  clearLocalIdentityState();
-
-  if (logoutInfo.logoutUrl) {
-    window.location.href = logoutInfo.logoutUrl;
-    return;
-  }
-
-  window.location.reload();
 }
 
 function defaultFamily() {
@@ -994,37 +947,40 @@ function ensureFamilyShape(input) {
     children = [];
   }
 
-  const dedupedChildren = [];
-  const seenById = new Set();
-  const seenByAccountId = new Set();
-  const seenByExactTriplet = new Set();
+  const mergedByName = new Map();
 
   children.forEach((child) => {
-    const childId = String(child.id || "").trim();
-    const accountId = String(child.accountId || "").trim();
-    const exactTriplet = `${normalizeChildName(child.name)}|${cleanPin(child.pin)}|${accountId}`;
-
-    if (childId && seenById.has(childId)) {
-      return;
-    }
-    if (accountId && seenByAccountId.has(accountId)) {
-      return;
-    }
-    if (seenByExactTriplet.has(exactTriplet)) {
+    const normalizedName = normalizeChildName(child.name);
+    if (!normalizedName) {
       return;
     }
 
-    if (childId) {
-      seenById.add(childId);
+    const existing = mergedByName.get(normalizedName);
+    if (!existing) {
+      mergedByName.set(normalizedName, { ...child });
+      return;
     }
-    if (accountId) {
-      seenByAccountId.add(accountId);
-    }
-    seenByExactTriplet.add(exactTriplet);
-    dedupedChildren.push(child);
+
+    const preferred = String(existing.accountId || "").trim()
+      ? existing
+      : String(child.accountId || "").trim()
+        ? child
+        : Number(existing.createdAt || 0) >= Number(child.createdAt || 0)
+          ? existing
+          : child;
+
+    mergedByName.set(normalizedName, {
+      ...existing,
+      ...preferred,
+      id: String(existing.id || child.id || "").trim() || makeChildId(),
+      name: existing.name || child.name,
+      pin: cleanPin(existing.pin) || cleanPin(child.pin) || "0000",
+      accountId: String(existing.accountId || child.accountId || "").trim(),
+      createdAt: Number(existing.createdAt || child.createdAt) || Date.now()
+    });
   });
 
-  children = dedupedChildren;
+  children = Array.from(mergedByName.values());
 
   const requestedSelectionId = String(input.activeChildId || "").trim();
   const activeChildId = isSelfSelection(requestedSelectionId)
@@ -2334,6 +2290,11 @@ function handleAddChild(event) {
     return;
   }
 
+  if (findChildByName(name)) {
+    showAdminMessage("Un profil enfant avec ce nom existe deja.");
+    return;
+  }
+
   const child = {
     id: makeChildId(),
     name,
@@ -2418,12 +2379,6 @@ function bindEvents() {
   }
   if (el.leaveParentModeBtn) {
     el.leaveParentModeBtn.addEventListener("click", handleLeaveParentMode);
-  }
-  if (el.refreshIdentityBtn) {
-    el.refreshIdentityBtn.addEventListener("click", handleRefreshIdentity);
-  }
-  if (el.logoutBtn) {
-    el.logoutBtn.addEventListener("click", handleLogout);
   }
   if (el.addChildForm) {
     el.addChildForm.addEventListener("submit", handleAddChild);

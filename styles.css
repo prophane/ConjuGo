@@ -92,16 +92,6 @@ body {
   align-items: center;
 }
 
-.header-tools {
-  display: grid;
-  gap: 6px;
-  width: min(210px, 44vw);
-}
-
-.header-tools .mini-btn {
-  min-height: 32px;
-  font-size: 0.78rem;
-}
 
 .logo {
   width: 44px;
@@ -138,16 +128,6 @@ h1 {
   font-size: 0.82rem;
   font-weight: 800;
   color: #0369a1;
-}
-
-@media (max-width: 720px) {
-  .app-header {
-    align-items: flex-start;
-  }
-
-  .header-tools {
-    width: auto;
-  }
 }
 
 .app-shell {
