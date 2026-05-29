@@ -439,6 +439,25 @@ function getAccountIdFromUserRecord(userRecord) {
   return String(userRecord.email || userRecord.providerSubject || userRecord.id || "").trim();
 }
 
+function getSuggestedChildNameFromUserRecord(userRecord) {
+  if (!userRecord || typeof userRecord !== "object") {
+    return "";
+  }
+
+  const displayFirstName = toFirstName(userRecord.displayName);
+  if (displayFirstName) {
+    return displayFirstName;
+  }
+
+  const email = String(userRecord.email || "").trim();
+  if (!email || !email.includes("@")) {
+    return "";
+  }
+
+  const localPart = email.split("@")[0] || "";
+  return localPart ? localPart.replace(/[._-]+/g, " ").trim() : "";
+}
+
 function getChildDisplayName(child) {
   if (!child) {
     return "-";
@@ -570,6 +589,8 @@ async function renderAccountUsersList() {
   users.forEach((userRecord) => {
     const accountId = getAccountIdFromUserRecord(userRecord);
     const linkedChild = state.family.children.find((child) => String(child.accountId || "").trim() === accountId) || null;
+    const suggestedChildName = getSuggestedChildNameFromUserRecord(userRecord);
+    const existingChildByName = linkedChild ? linkedChild : findChildByName(suggestedChildName);
     const isParentAccount = Boolean(parentAccountId && accountId && parentAccountId === accountId);
 
     const row = document.createElement("article");
@@ -609,6 +630,21 @@ async function renderAccountUsersList() {
       unlinkButton.dataset.accountId = accountId;
       unlinkButton.dataset.userId = String(userRecord.id || "").trim();
       actions.appendChild(unlinkButton);
+    } else if (existingChildByName) {
+      badge.textContent = `Profil enfant: ${getChildDisplayName(existingChildByName)}`;
+      actions.appendChild(badge);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "mini-btn";
+      button.textContent = "Lier ce compte";
+      button.dataset.action = "define-child";
+      button.dataset.accountId = accountId;
+      button.dataset.userId = String(userRecord.id || "").trim();
+      button.dataset.childId = existingChildByName.id;
+      button.dataset.accountName = existingChildByName.name || userRecord.displayName || "";
+      button.dataset.accountEmail = userRecord.email || "";
+      actions.appendChild(button);
     } else {
       const button = document.createElement("button");
       button.type = "button";
@@ -735,6 +771,23 @@ async function handleAccountUsersClick(event) {
 
   if (state.family.children.some((child) => String(child.accountId || "").trim() === accountId)) {
     showAdminMessage("Ce compte est deja lie a un profil enfant. Utilise 'Retirer enfant' pour le delier.");
+    return;
+  }
+
+  const targetChildId = String(button.dataset.childId || "").trim();
+  if (targetChildId) {
+    const existingChild = state.family.children.find((child) => child.id === targetChildId) || null;
+    if (!existingChild) {
+      showAdminMessage("Profil enfant cible introuvable.");
+      return;
+    }
+
+    existingChild.accountId = accountId;
+    saveFamily();
+    saveProgress();
+    renderFamilyUI();
+    renderProgressPanel();
+    showAdminMessage(`Compte lie a ${getChildDisplayName(existingChild)}.`);
     return;
   }
 
