@@ -11,6 +11,7 @@ const FAMILY_API_ENDPOINT = "/api/family-state";
 const USERS_API_ENDPOINT = "/api/users";
 const APP_VERSION = "v2026.05.27.1";
 const STICKER_CATALOG_SIZE = 30;
+const STICKER_UNLOCK_XP_STEP = 40;
 const SELF_SELECTION_ID = "__self__";
 
 const STICKER_SOURCES = [
@@ -430,10 +431,60 @@ function getUnlockedCount(progress) {
 }
 
 function getStickerUnlockTarget(progress) {
-  const levelInfo = getProgressLevel(progress);
-  const unlocksPerLevel = 25;
-  const target = ((levelInfo.level - 1) * unlocksPerLevel) + ((levelInfo.xpIntoLevel / LEVEL_SIZE) * unlocksPerLevel);
-  return Math.min(CARD_DEFS.length, Math.floor(target));
+  const xp = Math.max(0, Number(progress && progress.xp ? progress.xp : 0));
+  const target = Math.floor(xp / STICKER_UNLOCK_XP_STEP);
+  return Math.min(CARD_DEFS.length, target);
+}
+
+function sanitizeCollection(progress) {
+  const collection = progress && progress.collection && typeof progress.collection === "object"
+    ? { ...progress.collection }
+    : {};
+  const catalogIds = new Set(CARD_DEFS.map((card) => card.id));
+
+  Object.keys(collection).forEach((cardId) => {
+    const count = Math.floor(Number(collection[cardId] || 0));
+    if (!catalogIds.has(cardId) || count <= 0) {
+      delete collection[cardId];
+      return;
+    }
+    collection[cardId] = count;
+  });
+
+  return collection;
+}
+
+function repairLegacyOverUnlockedCollection(progress) {
+  if (!progress) {
+    return;
+  }
+
+  const unlockedCount = getUnlockedCount(progress);
+  if (unlockedCount !== CARD_DEFS.length) {
+    return;
+  }
+
+  const sessionsCount = Number(progress.sessionsCount || 0);
+  if (sessionsCount > 5) {
+    return;
+  }
+
+  const xpTarget = getStickerUnlockTarget(progress);
+  const sessionTarget = Math.min(CARD_DEFS.length, Math.max(1, sessionsCount));
+  const repairedTarget = Math.max(xpTarget, sessionTarget);
+
+  if (repairedTarget >= unlockedCount) {
+    return;
+  }
+
+  const keepIds = new Set(CARD_DEFS.slice(0, repairedTarget).map((card) => card.id));
+  Object.keys(progress.collection || {}).forEach((cardId) => {
+    if (!keepIds.has(cardId)) {
+      delete progress.collection[cardId];
+      return;
+    }
+    progress.collection[cardId] = Math.max(1, Math.floor(Number(progress.collection[cardId] || 1)));
+  });
 }
 
 function unlockCardsForProgress(progress) {
@@ -1292,13 +1343,16 @@ async function loadFamilyStateFromServer() {
 }
 
 function getProgressSnapshotForChild(childId) {
-  if (!state.progressStore || !state.progressStore.byChild) {
-    return defaultProgress();
-  }
-  return {
+  const snapshot = !state.progressStore || !state.progressStore.byChild
+    ? defaultProgress()
+    : {
     ...defaultProgress(),
     ...(state.progressStore.byChild[childId] || {})
   };
+
+  snapshot.collection = sanitizeCollection(snapshot);
+  repairLegacyOverUnlockedCollection(snapshot);
+  return snapshot;
 }
 
 function renderChildrenOverview() {
@@ -1703,8 +1757,14 @@ function renderProgressPanel() {
 
   if (el.unlockProgressLine) {
     const unlockedCount = getUnlockedCount(state.progress);
-    const target = getStickerUnlockTarget(state.progress);
-    el.unlockProgressLine.textContent = `Stickers debloques: ${unlockedCount} / ${CARD_DEFS.length} · Objectif courant: ${target}`;
+    const xpTarget = getStickerUnlockTarget(state.progress);
+    if (unlockedCount >= CARD_DEFS.length) {
+      el.unlockProgressLine.textContent = `Stickers debloques: ${unlockedCount} / ${CARD_DEFS.length} · Collection complete`;
+    } else {
+      const nextXpStep = (xpTarget + 1) * STICKER_UNLOCK_XP_STEP;
+      el.unlockProgressLine.textContent =
+        `Stickers debloques: ${unlockedCount} / ${CARD_DEFS.length} · Palier XP: ${xpTarget} (1 sticker / ${STICKER_UNLOCK_XP_STEP} xp, prochain a ${nextXpStep} xp)`;
+    }
   }
 
   if (el.badgeWall) {
