@@ -21,6 +21,13 @@ const STICKER_SOURCES = [
   "./stickers/brainy-slime.svg"
 ];
 
+const TENSE_DEFS = {
+  present: { label: "Present" },
+  futur: { label: "Futur" },
+  passeCompose: { label: "Passe compose" }
+};
+const DEFAULT_TENSES = ["present"];
+
 const CARD_DEFS = BRAINROT_PIPELINE
   ? BRAINROT_PIPELINE.buildBrainrotCatalog(STICKER_CATALOG_SIZE, STICKER_SOURCES)
   : [];
@@ -126,6 +133,7 @@ const FUNNY_RETRY_LINES = [
 
 const state = {
   selected: new Set(),
+  selectedTenses: new Set(DEFAULT_TENSES),
   questions: [],
   currentIndex: 0,
   score: 0,
@@ -156,6 +164,7 @@ const el = {
     result: document.getElementById("view-result")
   },
   cards: Array.from(document.querySelectorAll(".cat-card")),
+  tenseCards: Array.from(document.querySelectorAll(".tense-card")),
   familyStatusLine: document.getElementById("familyStatusLine"),
   selectionFollowLine: document.getElementById("selectionFollowLine"),
   activeChildSelect: document.getElementById("activeChildSelect"),
@@ -545,7 +554,7 @@ function renderUserHeader() {
   const activeChild = getActiveChild();
   const modeLabel = state.isParentMode ? "parent/admin" : "enfant";
 
-  subtitleEl.textContent = "Le mini-jeu du present";
+  subtitleEl.textContent = "Le mini-jeu de conjugaison";
 
   if (!state.user && !activeChild) {
     userLineEl.hidden = true;
@@ -1999,12 +2008,13 @@ function buildFunnyQuestionPrompt(question) {
 
   const template = randomFromList(templates);
   if (!template) {
-    return `Complete: ${getPromptPronoun(question)} ___ (${question.verb})`;
+    return `Complete (${question.tenseLabel}): ${getPromptPronoun(question)} ___ (${question.verb})`;
   }
 
   const pronoun = getPromptPronoun(question);
   const pronounBlank = `${pronoun}${pronoun.endsWith("'") ? "" : " "}___`;
-  return template.replace("{pronounBlank}", pronounBlank).replace("{verb}", question.verb);
+  const sentence = template.replace("{pronounBlank}", pronounBlank).replace("{verb}", question.verb);
+  return `${sentence} (${question.tenseLabel})`;
 }
 
 function setRandomMascot() {
@@ -2024,7 +2034,11 @@ function showView(name) {
 }
 
 function savePreferences() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...state.selected]));
+  const payload = {
+    categories: [...state.selected],
+    tenses: [...state.selectedTenses]
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
 
 function loadPreferences() {
@@ -2040,6 +2054,30 @@ function loadPreferences() {
           state.selected.add(cat);
         }
       });
+      state.selectedTenses = new Set(DEFAULT_TENSES);
+      return;
+    }
+
+    if (saved && typeof saved === "object") {
+      if (Array.isArray(saved.categories)) {
+        saved.categories.forEach((cat) => {
+          if (CONJUGO_DATA.categories[cat]) {
+            state.selected.add(cat);
+          }
+        });
+      }
+
+      if (Array.isArray(saved.tenses)) {
+        saved.tenses.forEach((tenseKey) => {
+          if (TENSE_DEFS[tenseKey]) {
+            state.selectedTenses.add(tenseKey);
+          }
+        });
+      }
+
+      if (!state.selectedTenses.size) {
+        state.selectedTenses = new Set(DEFAULT_TENSES);
+      }
     }
   } catch (_error) {
     // Ignore malformed local data.
@@ -2054,18 +2092,27 @@ function updateConfigUI() {
     card.setAttribute("aria-pressed", active ? "true" : "false");
   });
 
+  el.tenseCards.forEach((card) => {
+    const tenseKey = card.dataset.tense;
+    const active = state.selectedTenses.has(tenseKey);
+    card.classList.toggle("active", active);
+    card.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+
   const labels = [...state.selected].map((cat) => CONJUGO_DATA.categories[cat].label);
+  const tenseLabels = [...state.selectedTenses].map((tenseKey) => TENSE_DEFS[tenseKey].label);
   if (labels.length) {
-    el.selectionSummary.textContent = `Tu as choisi: ${labels.join(", ")}`;
+    el.selectionSummary.textContent = `Tu as choisi: ${labels.join(", ")} · Temps: ${tenseLabels.join(", ") || "aucun"}`;
   } else {
     el.selectionSummary.textContent = "Aucune categorie selectionnee.";
   }
 
   if (el.selectionFollowLine) {
-    el.selectionFollowLine.textContent = `Selection suivie pour ${getSelectionDisplayName()}: ${labels.join(", ") || "aucune categorie"}`;
+    el.selectionFollowLine.textContent =
+      `Selection suivie pour ${getSelectionDisplayName()}: ${labels.join(", ") || "aucune categorie"} · Temps: ${tenseLabels.join(", ") || "aucun"}`;
   }
 
-  el.startBtn.disabled = labels.length === 0;
+  el.startBtn.disabled = labels.length === 0 || tenseLabels.length === 0;
 }
 
 function buildCategoryTargets(selectedCategories, total) {
@@ -2085,20 +2132,48 @@ function buildCategoryTargets(selectedCategories, total) {
   return targets;
 }
 
-function getCategoryCandidates(categoryKey) {
+function getTenseLabel(tenseKey) {
+  return TENSE_DEFS[tenseKey] ? TENSE_DEFS[tenseKey].label : tenseKey;
+}
+
+function getVerbFormsByTense(verb, tenseKey) {
+  if (tenseKey === "futur") {
+    return verb.futurForms || {};
+  }
+  if (tenseKey === "passeCompose") {
+    return verb.passeComposeForms || {};
+  }
+  return verb.forms || {};
+}
+
+function getVerbForm(verb, tenseKey, pronounKey) {
+  const forms = getVerbFormsByTense(verb, tenseKey);
+  return String(forms[pronounKey] || "").trim();
+}
+
+function getCategoryCandidates(categoryKey, selectedTenses) {
   const category = CONJUGO_DATA.categories[categoryKey];
   const pronouns = CONJUGO_DATA.pronouns;
   const candidates = [];
 
   category.verbs.forEach((verb) => {
-    pronouns.forEach((pronoun) => {
-      candidates.push({
-        categoryKey,
-        categoryLabel: category.label,
-        verb: verb.infinitive,
-        pronounKey: pronoun.key,
-        pronounLabel: pronoun.label,
-        answer: verb.forms[pronoun.key]
+    selectedTenses.forEach((tenseKey) => {
+      pronouns.forEach((pronoun) => {
+        const answer = getVerbForm(verb, tenseKey, pronoun.key);
+        if (!answer) {
+          return;
+        }
+
+        candidates.push({
+          categoryKey,
+          categoryLabel: category.label,
+          verb: verb.infinitive,
+          pronounKey: pronoun.key,
+          pronounLabel: pronoun.label,
+          tenseKey,
+          tenseLabel: getTenseLabel(tenseKey),
+          answer
+        });
       });
     });
   });
@@ -2123,13 +2198,13 @@ function findVerb(categoryKey, verbInfinitive) {
   return CONJUGO_DATA.categories[categoryKey].verbs.find((verb) => verb.infinitive === verbInfinitive);
 }
 
-function generateQuestions(selectedCategories, total = SESSION_SIZE) {
+function generateQuestions(selectedCategories, selectedTenses, total = SESSION_SIZE) {
   const usedPair = new Set();
   const recentVerbs = [];
   const pronounUsage = Object.fromEntries(CONJUGO_DATA.pronouns.map((p) => [p.key, 0]));
   const targets = buildCategoryTargets(selectedCategories, total);
   const candidatesByCategory = Object.fromEntries(
-    selectedCategories.map((cat) => [cat, getCategoryCandidates(cat)])
+    selectedCategories.map((cat) => [cat, getCategoryCandidates(cat, selectedTenses)])
   );
 
   const questions = [];
@@ -2143,7 +2218,7 @@ function generateQuestions(selectedCategories, total = SESSION_SIZE) {
     let fallbackPicked = null;
 
     for (const cat of shuffle(stepCats)) {
-      const uniqueCandidates = candidatesByCategory[cat].filter((c) => !usedPair.has(`${c.verb}|${c.pronounKey}`));
+      const uniqueCandidates = candidatesByCategory[cat].filter((c) => !usedPair.has(`${c.verb}|${c.pronounKey}|${c.tenseKey}`));
       const allCandidates = candidatesByCategory[cat];
 
       const sortCandidates = (candidates) => [...candidates].sort((a, b) => {
@@ -2175,7 +2250,7 @@ function generateQuestions(selectedCategories, total = SESSION_SIZE) {
       break;
     }
 
-    const pairKey = `${picked.verb}|${picked.pronounKey}`;
+    const pairKey = `${picked.verb}|${picked.pronounKey}|${picked.tenseKey}`;
     usedPair.add(pairKey);
     pronounUsage[picked.pronounKey] += 1;
     recentVerbs.push(picked.verb);
@@ -2224,7 +2299,8 @@ function buildMcqOptions(question, selectedCategories) {
   const pool = [];
 
   const currentVerb = findVerb(question.categoryKey, question.verb);
-  Object.entries(currentVerb.forms).forEach(([pronounKey, fullForm]) => {
+  const currentForms = getVerbFormsByTense(currentVerb, question.tenseKey);
+  Object.entries(currentForms).forEach(([pronounKey, fullForm]) => {
     if (pronounKey !== question.pronounKey) {
       pool.push(extractVerbForm(fullForm));
     }
@@ -2233,8 +2309,9 @@ function buildMcqOptions(question, selectedCategories) {
   selectedCategories.forEach((cat) => {
     const category = CONJUGO_DATA.categories[cat];
     category.verbs.forEach((verb) => {
-      const form = extractVerbForm(verb.forms[question.pronounKey]);
-      if (form !== correctForm) {
+      const fullForm = getVerbForm(verb, question.tenseKey, question.pronounKey);
+      const form = extractVerbForm(fullForm);
+      if (form && form !== correctForm) {
         pool.push(form);
       }
     });
@@ -2259,7 +2336,7 @@ function renderQuestion() {
   el.progressBar.style.width = `${((state.currentIndex + 1) / SESSION_SIZE) * 100}%`;
 
   el.pronounBadge.textContent = question.pronounLabel;
-  el.verbLabel.textContent = question.verb;
+  el.verbLabel.textContent = `${question.verb} · ${question.tenseLabel}`;
   el.questionExplain.textContent = buildFunnyQuestionPrompt(question);
 
   el.feedback.hidden = true;
@@ -2394,6 +2471,7 @@ function validateTypedAnswer(inputEl) {
     state.errors.push({
       verb: question.verb,
       pronoun: question.pronounLabel,
+      tense: question.tenseLabel,
       expected: formatFullAnswer(question, canonicalForm),
       selected: selectedText
     });
@@ -2433,6 +2511,7 @@ function validateAnswer(selectedText, clickedButton) {
     state.errors.push({
       verb: question.verb,
       pronoun: question.pronounLabel,
+      tense: question.tenseLabel,
       expected: formatFullAnswer(question, correctForm),
       selected: selectedText
     });
@@ -2467,9 +2546,9 @@ function scoreMessage(score) {
     return "Bravo! Tu es sur la bonne voie, continue!";
   }
   if (score <= 9) {
-    return "Excellent! Tu conjugues tres bien au present!";
+    return "Excellent! Tu conjugues tres bien!";
   }
-  return "Parfait 10/10! Tu es le boss du present!";
+  return "Parfait 10/10! Tu es le boss des temps choisis!";
 }
 
 function isElidedPronoun(question) {
@@ -2523,7 +2602,7 @@ function showResults() {
   } else {
     state.errors.forEach((entry) => {
       const li = document.createElement("li");
-      li.textContent = `${entry.pronoun} ${entry.verb} -> attendu: ${entry.expected}`;
+      li.textContent = `${entry.pronoun} ${entry.verb} (${entry.tense}) -> attendu: ${entry.expected}`;
       el.errorList.appendChild(li);
     });
   }
@@ -2531,11 +2610,12 @@ function showResults() {
 
 function startSession() {
   const selectedCategories = [...state.selected];
-  if (!selectedCategories.length) {
+  const selectedTenses = [...state.selectedTenses];
+  if (!selectedCategories.length || !selectedTenses.length) {
     return;
   }
 
-  state.questions = generateQuestions(selectedCategories, SESSION_SIZE);
+  state.questions = generateQuestions(selectedCategories, selectedTenses, SESSION_SIZE);
   const currentLevel = getProgressLevel(state.progress || defaultProgress()).level;
   applyProgressiveDifficulty(state.questions, currentLevel);
   state.currentIndex = 0;
@@ -2753,8 +2833,31 @@ function handleCategoryToggle(event) {
   updateConfigUI();
 }
 
+function handleTenseToggle(event) {
+  const button = event.currentTarget;
+  const tenseKey = button.dataset.tense;
+
+  if (!TENSE_DEFS[tenseKey]) {
+    return;
+  }
+
+  if (state.selectedTenses.has(tenseKey)) {
+    state.selectedTenses.delete(tenseKey);
+  } else {
+    state.selectedTenses.add(tenseKey);
+  }
+
+  if (!state.selectedTenses.size) {
+    state.selectedTenses.add("present");
+  }
+
+  savePreferences();
+  updateConfigUI();
+}
+
 function bindEvents() {
   el.cards.forEach((card) => card.addEventListener("click", handleCategoryToggle));
+  el.tenseCards.forEach((card) => card.addEventListener("click", handleTenseToggle));
   if (el.activeChildSelect) {
     el.activeChildSelect.addEventListener("change", handleChildSwitch);
   }

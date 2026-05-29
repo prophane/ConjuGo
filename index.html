@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f172a" />
-    <meta name="description" content="Conjugo Pop - entrainement CE1 au present" />
+    <meta name="description" content="Conjugo Pop - entrainement CE1 en conjugaison" />
     <title>Conjugo Pop</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon-192.svg" type="image/svg+xml" />
@@ -22,7 +22,7 @@
         <div class="logo">CP</div>
         <div>
           <h1>Conjugo Pop</h1>
-          <p class="subtitle" id="subtitleText">Le mini-jeu du present</p>
+          <p class="subtitle" id="subtitleText">Le mini-jeu de conjugaison</p>
           <p class="user-line" id="userLine" hidden></p>
         </div>
       </div>
@@ -69,6 +69,24 @@
             <span class="cat-title">3e groupe</span>
           </button>
         </div>
+
+        <section aria-labelledby="tense-title">
+          <h3 id="tense-title">Temps</h3>
+          <div class="grid-cards" role="group" aria-label="Temps de conjugaison">
+            <button class="cat-card tense-card" data-tense="present" aria-pressed="true" type="button">
+              <span class="cat-icon">🟢</span>
+              <span class="cat-title">Present</span>
+            </button>
+            <button class="cat-card tense-card" data-tense="futur" aria-pressed="false" type="button">
+              <span class="cat-icon">🔮</span>
+              <span class="cat-title">Futur</span>
+            </button>
+            <button class="cat-card tense-card" data-tense="passeCompose" aria-pressed="false" type="button">
+              <span class="cat-icon">⏳</span>
+              <span class="cat-title">Passe compose</span>
+            </button>
+          </div>
+        </section>
 
         <div class="selection-box" id="selectionSummary" aria-live="polite">Aucune categorie selectionnee.</div>
 
@@ -295,7 +313,7 @@
       </article>
     </div>
 
-    <footer class="app-footer">Present CE1 · fun et progressif · <span id="appVersion">v?</span></footer>
+    <footer class="app-footer">Conjugaison CE1 · fun et progressif · <span id="appVersion">v?</span></footer>
 
     <script src="./data.js"></script>
     <script src="./brainrot-visuals.js"></script>
