@@ -1508,7 +1508,8 @@ function loadProgress() {
     const parsed = JSON.parse(raw);
 
     if (parsed && typeof parsed === "object" && parsed.schema === 2 && parsed.byChild) {
-      const storedSelection = normalizeSelectionId(parsed.activeChildId || activeSelectionId);
+      // Keep the user's current profile choice as source of truth when switching profiles.
+      const storedSelection = normalizeSelectionId(activeSelectionId || parsed.activeChildId);
       state.activeChildId = storedSelection;
       state.progressStore = {
         schema: 2,
