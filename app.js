@@ -494,7 +494,8 @@ function isKnownChildId(selectionId) {
   if (!state.family || !selectionId) {
     return false;
   }
-  return state.family.children.some((child) => child.id === selectionId);
+  const normalizedSelectionId = String(selectionId).trim();
+  return state.family.children.some((child) => String(child.id || "").trim() === normalizedSelectionId);
 }
 
 function normalizeSelectionId(selectionId) {
@@ -526,7 +527,8 @@ function getSelectionDisplayName(selectionId = state.activeChildId) {
     return "-";
   }
 
-  const child = state.family.children.find((entry) => entry.id === selectionId) || null;
+  const normalizedSelectionId = String(selectionId || "").trim();
+  const child = state.family.children.find((entry) => String(entry.id || "").trim() === normalizedSelectionId) || null;
   return getChildDisplayName(child);
 }
 
@@ -947,7 +949,8 @@ function getActiveChild() {
   if (!state.family) {
     return null;
   }
-  return state.family.children.find((child) => child.id === state.activeChildId) || null;
+  const activeId = String(state.activeChildId || "").trim();
+  return state.family.children.find((child) => String(child.id || "").trim() === activeId) || null;
 }
 
 function normalizeChildName(name) {
@@ -988,7 +991,7 @@ function ensureFamilyShape(input) {
     ? input.children
         .filter((child) => child && typeof child.name === "string")
         .map((child, index) => ({
-          id: child.id || `child-${index + 1}`,
+          id: String(child.id || `child-${index + 1}`).trim(),
           name: child.name.trim() || `Enfant ${index + 1}`,
           pin: cleanPin(child.pin) || "0000",
           accountId: String(child.accountId || "").trim(),
@@ -1376,9 +1379,9 @@ function renderFamilyUI() {
 
     state.family.children.forEach((child) => {
       const option = document.createElement("option");
-      option.value = child.id;
+      option.value = String(child.id || "").trim();
       option.textContent = getChildDisplayName(child);
-      if (child.id === state.activeChildId) {
+      if (String(child.id || "").trim() === String(state.activeChildId || "").trim()) {
         option.selected = true;
       }
       el.activeChildSelect.appendChild(option);
@@ -2301,7 +2304,8 @@ function handleChildSwitch(event) {
     return;
   }
 
-  const targetChild = state.family.children.find((child) => child.id === targetChildId);
+  const normalizedTargetChildId = String(targetChildId || "").trim();
+  const targetChild = state.family.children.find((child) => String(child.id || "").trim() === normalizedTargetChildId);
   if (!targetChild) {
     return;
   }
