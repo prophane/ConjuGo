@@ -39,13 +39,28 @@ const LEVEL_LABELS = [
   "Boss des verbes"
 ];
 
-const FUNNY_QUESTION_TEMPLATES = [
-  "Dans la cuisine de l'espace, {pronounBlank} ({verb}) une soupe arc-en-ciel.",
-  "Au stade des pingouins, {pronounBlank} ({verb}) avec des chaussures a ressorts.",
-  "Dans un chateau en carton, {pronounBlank} ({verb}) avec un dragon qui rigole.",
-  "Sur une planete en bonbons, {pronounBlank} ({verb}) pendant qu'il pleut des confettis.",
-  "Au cinema des licornes, {pronounBlank} ({verb}) en mangeant du pop-corn geant.",
-  "Dans un bus volant, {pronounBlank} ({verb}) en pyjama de super-heros."
+const FUNNY_ETRE_TEMPLATES = [
+  "Dans le dojo des etoiles, {pronounBlank} ({verb}) en forme olympique.",
+  "A la fete des robots, {pronounBlank} ({verb}) au top aujourd'hui.",
+  "Sur la planete des licornes, {pronounBlank} ({verb}) dans la lune mais efficaces.",
+  "Dans le bus volant, {pronounBlank} ({verb}) en mission secrete.",
+  "Au stade des pingouins, {pronounBlank} ({verb}) au rendez-vous."
+];
+
+const FUNNY_AVOIR_TEMPLATES = [
+  "Dans la cuisine de l'espace, {pronounBlank} ({verb}) une louche magique.",
+  "Au cinema des licornes, {pronounBlank} ({verb}) du pop-corn geant.",
+  "Sur la lune en bonbons, {pronounBlank} ({verb}) un skate antigravite.",
+  "Au stade des pingouins, {pronounBlank} ({verb}) des baskets turbo.",
+  "Dans le chateau en carton, {pronounBlank} ({verb}) une carte au tresor."
+];
+
+const FUNNY_GENERIC_TEMPLATES = [
+  "Dans la cour des dragons, {pronounBlank} ({verb}) en mode turbo.",
+  "Sur une scene disco, {pronounBlank} ({verb}) comme des super-heros.",
+  "Dans la ville des robots, {pronounBlank} ({verb}) sans perdre le sourire.",
+  "Au sommet d'un nuage geant, {pronounBlank} ({verb}) avec style.",
+  "Dans le laboratoire secret, {pronounBlank} ({verb}) comme des champions."
 ];
 
 const FUNNY_SUCCESS_LINES = [
@@ -1872,7 +1887,14 @@ function randomFromList(list) {
 }
 
 function buildFunnyQuestionPrompt(question) {
-  const template = randomFromList(FUNNY_QUESTION_TEMPLATES);
+  const infinitive = String(question && question.verb ? question.verb : "").trim().toLowerCase();
+  const templates = infinitive === "etre"
+    ? FUNNY_ETRE_TEMPLATES
+    : infinitive === "avoir"
+      ? FUNNY_AVOIR_TEMPLATES
+      : FUNNY_GENERIC_TEMPLATES;
+
+  const template = randomFromList(templates);
   if (!template) {
     return `Complete: ${getPromptPronoun(question)} ___ (${question.verb})`;
   }
