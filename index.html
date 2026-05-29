@@ -75,6 +75,7 @@
         <div class="home-actions">
           <button id="startBtn" class="cta" disabled>Commencer (10 questions)</button>
           <button id="progressBtn" class="ghost strong">Progression</button>
+          <button id="openAdminBtn" class="ghost" type="button">Espace parent/admin</button>
         </div>
       </section>
 
@@ -85,7 +86,10 @@
             <p class="hint">Niveau, xp, recompenses et collection.</p>
             <p class="hint" id="progressChildLine">Profil: -</p>
           </div>
-          <button id="backTrainingBtn" class="ghost strong">Retour entrainement</button>
+          <div class="header-actions">
+            <button id="openAdminFromProgressBtn" class="ghost" type="button">Espace parent/admin</button>
+            <button id="backTrainingBtn" class="ghost strong">Retour entrainement</button>
+          </div>
         </div>
 
         <section class="level-panel" aria-labelledby="levelTitle">
@@ -118,50 +122,105 @@
           <div class="badge-wall" id="badgeWall" aria-live="polite"></div>
         </section>
 
-        <section class="tracker-panel" id="parentAdminPanel" aria-labelledby="parentAdminTitle" hidden>
-          <h3 id="parentAdminTitle">Espace parent/admin</h3>
-          <p class="hint">Ajoute des profils enfants et suis leur progression globale.</p>
+        <section class="gallery-panel" aria-labelledby="collectionTitle">
+          <h3 id="collectionTitle">Stickers gagnes</h3>
+          <div class="collection-grid" id="collectionGrid" aria-live="polite"></div>
+        </section>
+      </section>
+
+      <section id="view-admin" class="view" aria-labelledby="admin-view-title">
+        <div class="progress-header">
+          <div>
+            <h2 id="admin-view-title">Espace parent/admin</h2>
+            <p class="hint">Gestion des comptes, profils enfants et controles famille.</p>
+          </div>
+          <div class="header-actions">
+            <button id="backProgressFromAdminBtn" class="ghost" type="button">Voir progression</button>
+            <button id="backTrainingFromAdminBtn" class="ghost strong" type="button">Retour entrainement</button>
+          </div>
+        </div>
+
+        <section id="adminLockedNotice" class="tracker-panel" hidden>
+          <h3>Acces restreint</h3>
+          <p class="hint">Active d'abord le mode parent/admin depuis la page d'entrainement pour acceder aux actions sensibles.</p>
+        </section>
+
+        <section class="tracker-panel parent-admin-shell" id="parentAdminPanel" aria-labelledby="parentAdminTitle" hidden>
+          <h3 id="parentAdminTitle">Centre parent/admin</h3>
+          <p class="hint">Pilote ta mini-classe: profils, comptes connectes et acces parent.</p>
+
+          <div class="admin-overview-grid" id="adminOverviewGrid" aria-live="polite">
+            <article class="admin-kpi">
+              <p class="kpi-label">Profils enfants</p>
+              <p class="kpi-value" id="adminChildCount">0</p>
+              <p class="kpi-hint" id="adminActiveProfileLine">Profil actif: -</p>
+            </article>
+            <article class="admin-kpi">
+              <p class="kpi-label">Comptes uniques</p>
+              <p class="kpi-value" id="adminKnownUsersCount">0</p>
+              <p class="kpi-hint">Tous appareils confondus</p>
+            </article>
+            <article class="admin-kpi">
+              <p class="kpi-label">Comptes lies a un enfant</p>
+              <p class="kpi-value" id="adminLinkedUsersCount">0</p>
+              <p class="kpi-hint">Attribution terminee</p>
+            </article>
+            <article class="admin-kpi">
+              <p class="kpi-label">Acces parent cote enfant</p>
+              <p class="kpi-value kpi-state" id="adminAccessState">Visible</p>
+              <p class="kpi-hint">Peut etre masque en un clic</p>
+            </article>
+          </div>
+
           <div class="admin-tabs" role="tablist" aria-label="Sections parent">
             <button id="adminChildrenTab" class="mini-btn is-active" type="button" role="tab" aria-selected="true">Enfants</button>
             <button id="adminBrainrotTab" class="mini-btn" type="button" role="tab" aria-selected="false">Brainrot</button>
           </div>
 
           <div id="adminChildrenPanel" role="tabpanel">
-          <form id="addChildForm" class="admin-form">
-            <input id="childNameInput" type="text" minlength="2" maxlength="20" placeholder="Nom enfant" required />
-            <input
-              id="childPinInput"
-              type="password"
-              minlength="4"
-              maxlength="8"
-              inputmode="numeric"
-              placeholder="PIN enfant"
-              required
-            />
-            <button class="cta small" type="submit">Ajouter profil</button>
-          </form>
-          <p id="adminMsg" class="hint" aria-live="polite"></p>
-          <div class="family-actions">
-            <button id="lockParentAccessBtn" class="ghost strong" type="button">Verrouiller acces parent cote enfant</button>
-            <button id="unlockParentAccessBtn" class="ghost" type="button">Afficher acces parent</button>
-          </div>
-          <section class="account-users-panel" aria-labelledby="accountUsersTitle">
-            <h4 id="accountUsersTitle">Comptes connectes</h4>
-            <p class="hint">Liste des utilisateurs connus. Tu peux definir si un compte est enfant.</p>
-            <div id="accountUsersList" class="account-users-list"></div>
-          </section>
-          <div id="childrenOverview" class="children-overview"></div>
+            <section class="admin-block" aria-labelledby="adminChildrenCreateTitle">
+              <h4 id="adminChildrenCreateTitle">Ajouter un profil enfant</h4>
+              <form id="addChildForm" class="admin-form">
+                <input id="childNameInput" type="text" minlength="2" maxlength="20" placeholder="Nom enfant" required />
+                <input
+                  id="childPinInput"
+                  type="password"
+                  minlength="4"
+                  maxlength="8"
+                  inputmode="numeric"
+                  placeholder="PIN enfant"
+                  required
+                />
+                <button class="cta small" type="submit">Ajouter profil</button>
+              </form>
+            </section>
+
+            <p id="adminMsg" class="hint" aria-live="polite"></p>
+
+            <section class="admin-block" aria-labelledby="adminAccessTitle">
+              <h4 id="adminAccessTitle">Controle d'acces parent</h4>
+              <div class="family-actions admin-action-row">
+                <button id="lockParentAccessBtn" class="ghost strong" type="button">Verrouiller acces parent cote enfant</button>
+                <button id="unlockParentAccessBtn" class="ghost" type="button">Afficher acces parent</button>
+              </div>
+            </section>
+
+            <section class="account-users-panel admin-block" aria-labelledby="accountUsersTitle">
+              <h4 id="accountUsersTitle">Comptes connectes</h4>
+              <p class="hint">Actions: Definir enfant, Retirer enfant, Supprimer compte. Le compte parent principal est protege.</p>
+              <div id="accountUsersList" class="account-users-list"></div>
+            </section>
+
+            <section class="admin-block" aria-labelledby="childrenOverviewTitle">
+              <h4 id="childrenOverviewTitle">Vue globale des enfants</h4>
+              <div id="childrenOverview" class="children-overview"></div>
+            </section>
           </div>
 
           <div id="adminBrainrotPanel" role="tabpanel" hidden>
             <p class="hint" id="brainrotCountLine">Brainrot disponibles: 0</p>
             <div id="adminBrainrotGrid" class="brainrot-grid"></div>
           </div>
-        </section>
-
-        <section class="gallery-panel" aria-labelledby="collectionTitle">
-          <h3 id="collectionTitle">Stickers gagnes</h3>
-          <div class="collection-grid" id="collectionGrid" aria-live="polite"></div>
         </section>
       </section>
 

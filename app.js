@@ -52,6 +52,7 @@ const state = {
   adminTab: "children",
   progressStore: null,
   isParentMode: false,
+  knownUsers: [],
   progress: null,
   sessionReward: {
     coins: 0,
@@ -65,6 +66,7 @@ const el = {
   views: {
     config: document.getElementById("view-config"),
     progress: document.getElementById("view-progress"),
+    admin: document.getElementById("view-admin"),
     session: document.getElementById("view-session"),
     result: document.getElementById("view-result")
   },
@@ -74,8 +76,10 @@ const el = {
   activeChildSelect: document.getElementById("activeChildSelect"),
   parentModeBtn: document.getElementById("parentModeBtn"),
   leaveParentModeBtn: document.getElementById("leaveParentModeBtn"),
+  openAdminBtn: document.getElementById("openAdminBtn"),
   progressChildLine: document.getElementById("progressChildLine"),
   parentAdminPanel: document.getElementById("parentAdminPanel"),
+  adminLockedNotice: document.getElementById("adminLockedNotice"),
   adminChildrenTab: document.getElementById("adminChildrenTab"),
   adminBrainrotTab: document.getElementById("adminBrainrotTab"),
   adminChildrenPanel: document.getElementById("adminChildrenPanel"),
@@ -97,13 +101,21 @@ const el = {
   childPinInput: document.getElementById("childPinInput"),
   lockParentAccessBtn: document.getElementById("lockParentAccessBtn"),
   unlockParentAccessBtn: document.getElementById("unlockParentAccessBtn"),
+  adminChildCount: document.getElementById("adminChildCount"),
+  adminKnownUsersCount: document.getElementById("adminKnownUsersCount"),
+  adminLinkedUsersCount: document.getElementById("adminLinkedUsersCount"),
+  adminAccessState: document.getElementById("adminAccessState"),
+  adminActiveProfileLine: document.getElementById("adminActiveProfileLine"),
   accountUsersList: document.getElementById("accountUsersList"),
   adminMsg: document.getElementById("adminMsg"),
   childrenOverview: document.getElementById("childrenOverview"),
   selectionSummary: document.getElementById("selectionSummary"),
   startBtn: document.getElementById("startBtn"),
   progressBtn: document.getElementById("progressBtn"),
+  openAdminFromProgressBtn: document.getElementById("openAdminFromProgressBtn"),
   backTrainingBtn: document.getElementById("backTrainingBtn"),
+  backTrainingFromAdminBtn: document.getElementById("backTrainingFromAdminBtn"),
+  backProgressFromAdminBtn: document.getElementById("backProgressFromAdminBtn"),
   openProgressFromResultBtn: document.getElementById("openProgressFromResultBtn"),
   counter: document.getElementById("counter"),
   progressBar: document.getElementById("progressBar"),
@@ -513,6 +525,27 @@ async function fetchKnownUsers() {
   }
 }
 
+async function removeKnownUserRecord(userId) {
+  try {
+    const response = await fetch(`${USERS_API_ENDPOINT}/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+      cache: "no-store"
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, error: payload.error || "delete_failed" };
+    }
+
+    return {
+      ok: true,
+      unlinkedChildren: Number(payload.unlinkedChildren || 0)
+    };
+  } catch (_error) {
+    return { ok: false, error: "network_error" };
+  }
+}
+
 async function renderAccountUsersList() {
   if (!el.accountUsersList || !state.family) {
     return;
@@ -521,11 +554,14 @@ async function renderAccountUsersList() {
   el.accountUsersList.innerHTML = "";
 
   const users = await fetchKnownUsers();
+  state.knownUsers = users;
+
   if (!users.length) {
     const empty = document.createElement("p");
     empty.className = "hint";
     empty.textContent = "Aucun utilisateur detecte pour le moment.";
     el.accountUsersList.appendChild(empty);
+    renderAdminOverview();
     return;
   }
 
@@ -564,45 +600,141 @@ async function renderAccountUsersList() {
     } else if (linkedChild) {
       badge.textContent = `Enfant: ${getChildDisplayName(linkedChild)}`;
       actions.appendChild(badge);
+
+      const unlinkButton = document.createElement("button");
+      unlinkButton.type = "button";
+      unlinkButton.className = "mini-btn";
+      unlinkButton.textContent = "Retirer enfant";
+      unlinkButton.dataset.action = "unlink-child";
+      unlinkButton.dataset.accountId = accountId;
+      unlinkButton.dataset.userId = String(userRecord.id || "").trim();
+      actions.appendChild(unlinkButton);
     } else {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "mini-btn";
       button.textContent = "Definir enfant";
+      button.dataset.action = "define-child";
       button.dataset.accountId = accountId;
       button.dataset.accountName = userRecord.displayName || "";
       button.dataset.accountEmail = userRecord.email || "";
+      button.dataset.userId = String(userRecord.id || "").trim();
       actions.appendChild(button);
+    }
+
+    if (!isParentAccount) {
+      const userId = String(userRecord.id || "").trim();
+      if (userId) {
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "mini-btn danger";
+        deleteButton.textContent = "Supprimer compte";
+        deleteButton.dataset.action = "delete-account";
+        deleteButton.dataset.userId = userId;
+        deleteButton.dataset.accountId = accountId;
+        actions.appendChild(deleteButton);
+      }
     }
 
     row.appendChild(identity);
     row.appendChild(actions);
     el.accountUsersList.appendChild(row);
   });
+
+  renderAdminOverview();
 }
 
-function handleAccountUsersClick(event) {
+async function handleAccountUsersClick(event) {
   if (!state.family || !state.isParentMode) {
     return;
   }
 
-  const button = event.target.closest("button[data-account-id]");
+  const button = event.target.closest("button[data-action]");
   if (!button) {
     return;
   }
 
+  const action = String(button.dataset.action || "").trim();
   const accountId = String(button.dataset.accountId || "").trim();
-  if (!accountId) {
+  const userId = String(button.dataset.userId || "").trim();
+  const isParentAccount = String(state.family.parent && state.family.parent.accountId ? state.family.parent.accountId : "").trim() === accountId;
+
+  if (!action) {
     return;
   }
 
-  if (String(state.family.parent && state.family.parent.accountId ? state.family.parent.accountId : "").trim() === accountId) {
+  if (action === "unlink-child") {
+    if (!accountId) {
+      showAdminMessage("Compte introuvable pour retirer le lien enfant.");
+      return;
+    }
+
+    const linkedChild = state.family.children.find((child) => String(child.accountId || "").trim() === accountId) || null;
+    if (!linkedChild) {
+      showAdminMessage("Aucun profil enfant lie a ce compte.");
+      return;
+    }
+
+    linkedChild.accountId = "";
+    saveFamily();
+    renderFamilyUI();
+    renderProgressPanel();
+    showAdminMessage(`Lien retire pour ${getChildDisplayName(linkedChild)}.`);
+    return;
+  }
+
+  if (action === "delete-account") {
+    if (!userId) {
+      showAdminMessage("Impossible de supprimer ce compte (identifiant manquant).");
+      return;
+    }
+
+    if (isParentAccount) {
+      showAdminMessage("Le compte parent principal ne peut pas etre supprime.");
+      return;
+    }
+
+    const confirmed = window.confirm("Supprimer ce compte de la liste des utilisateurs connus ?");
+    if (!confirmed) {
+      return;
+    }
+
+    button.disabled = true;
+    const result = await removeKnownUserRecord(userId);
+    button.disabled = false;
+
+    if (!result.ok) {
+      showAdminMessage("Suppression impossible pour le moment.");
+      return;
+    }
+
+    renderFamilyUI();
+    renderProgressPanel();
+
+    if (result.unlinkedChildren > 0) {
+      showAdminMessage(`Compte supprime. ${result.unlinkedChildren} lien(s) enfant retire(s).`);
+    } else {
+      showAdminMessage("Compte supprime de la liste.");
+    }
+    return;
+  }
+
+  if (action !== "define-child") {
+    return;
+  }
+
+  if (!accountId) {
+    showAdminMessage("Ce compte ne contient pas d'identifiant exploitable.");
+    return;
+  }
+
+  if (isParentAccount) {
     showAdminMessage("Le compte parent ne peut pas etre marque comme enfant.");
     return;
   }
 
   if (state.family.children.some((child) => String(child.accountId || "").trim() === accountId)) {
-    showAdminMessage("Ce compte est deja lie a un profil enfant.");
+    showAdminMessage("Ce compte est deja lie a un profil enfant. Utilise 'Retirer enfant' pour le delier.");
     return;
   }
 
@@ -984,6 +1116,52 @@ function renderChildrenOverview() {
   });
 }
 
+function renderAdminOverview() {
+  if (!state.family) {
+    return;
+  }
+
+  const children = Array.isArray(state.family.children) ? state.family.children : [];
+  const childCount = children.length;
+
+  const knownUsers = Array.isArray(state.knownUsers) ? state.knownUsers : [];
+  const knownAccountIds = new Set(
+    knownUsers
+      .map((entry) => getAccountIdFromUserRecord(entry))
+      .filter((accountId) => Boolean(accountId))
+  );
+
+  const childLinkedIds = new Set(
+    children
+      .map((child) => String(child.accountId || "").trim())
+      .filter((accountId) => Boolean(accountId))
+  );
+
+  const linkedCount = [...knownAccountIds].filter((accountId) => childLinkedIds.has(accountId)).length;
+  const hideParentAccess = Boolean(state.family.settings && state.family.settings.hideParentAccess);
+
+  if (el.adminChildCount) {
+    el.adminChildCount.textContent = String(childCount);
+  }
+
+  if (el.adminKnownUsersCount) {
+    el.adminKnownUsersCount.textContent = String(knownAccountIds.size || knownUsers.length);
+  }
+
+  if (el.adminLinkedUsersCount) {
+    el.adminLinkedUsersCount.textContent = String(linkedCount);
+  }
+
+  if (el.adminAccessState) {
+    el.adminAccessState.textContent = hideParentAccess ? "Verrouille" : "Visible";
+    el.adminAccessState.classList.toggle("is-locked", hideParentAccess);
+  }
+
+  if (el.adminActiveProfileLine) {
+    el.adminActiveProfileLine.textContent = `Profil actif: ${getSelectionDisplayName()}`;
+  }
+}
+
 function renderAdminBrainrotCatalog() {
   if (!el.adminBrainrotGrid) {
     return;
@@ -1105,6 +1283,9 @@ function renderFamilyUI() {
   if (el.parentAdminPanel) {
     el.parentAdminPanel.hidden = !state.isParentMode;
   }
+  if (el.adminLockedNotice) {
+    el.adminLockedNotice.hidden = state.isParentMode;
+  }
 
   if (el.leaveParentModeBtn) {
     el.leaveParentModeBtn.hidden = !state.isParentMode;
@@ -1116,8 +1297,19 @@ function renderFamilyUI() {
     el.parentModeBtn.disabled = !state.isParentMode && !isConnectedParent();
   }
 
+  if (el.openAdminBtn) {
+    el.openAdminBtn.hidden = hideParentAccess && !state.isParentMode && !isConnectedParent();
+    el.openAdminBtn.disabled = !state.isParentMode && !isConnectedParent();
+  }
+
+  if (el.openAdminFromProgressBtn) {
+    el.openAdminFromProgressBtn.hidden = hideParentAccess && !state.isParentMode && !isConnectedParent();
+    el.openAdminFromProgressBtn.disabled = !state.isParentMode && !isConnectedParent();
+  }
+
   setAdminTab(state.adminTab);
 
+  renderAdminOverview();
   renderAccountUsersList();
   renderChildrenOverview();
 }
@@ -1263,10 +1455,6 @@ function renderProgressPanel() {
   if (el.progressChildLine) {
     el.progressChildLine.textContent = `Profil: ${isSelfSelection(state.activeChildId) ? "Mon profil" : getChildDisplayName(activeChild)}`;
   }
-  if (el.parentAdminPanel) {
-    el.parentAdminPanel.hidden = !state.isParentMode;
-  }
-
   const accuracy = state.progress.totalQuestions
     ? Math.round((state.progress.totalCorrect / state.progress.totalQuestions) * 100)
     : 0;
@@ -1861,6 +2049,14 @@ function navigateToProgress() {
   renderProgressPanel();
 }
 
+function navigateToAdmin() {
+  showView("admin");
+  renderFamilyUI();
+  if (!state.isParentMode) {
+    showAdminMessage("Active le mode parent/admin depuis la page d'entrainement pour gerer les comptes.");
+  }
+}
+
 function showResults() {
   applySessionRewards();
   showView("result");
@@ -2147,7 +2343,19 @@ function bindEvents() {
   }
   el.startBtn.addEventListener("click", startSession);
   el.progressBtn.addEventListener("click", navigateToProgress);
+  if (el.openAdminBtn) {
+    el.openAdminBtn.addEventListener("click", navigateToAdmin);
+  }
+  if (el.openAdminFromProgressBtn) {
+    el.openAdminFromProgressBtn.addEventListener("click", navigateToAdmin);
+  }
   el.backTrainingBtn.addEventListener("click", backToTraining);
+  if (el.backTrainingFromAdminBtn) {
+    el.backTrainingFromAdminBtn.addEventListener("click", backToTraining);
+  }
+  if (el.backProgressFromAdminBtn) {
+    el.backProgressFromAdminBtn.addEventListener("click", navigateToProgress);
+  }
   el.openProgressFromResultBtn.addEventListener("click", navigateToProgress);
   el.nextBtn.addEventListener("click", nextQuestion);
   el.replayBtn.addEventListener("click", startSession);

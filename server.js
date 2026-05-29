@@ -320,6 +320,70 @@ function listKnownUsers() {
     .sort((a, b) => String(b.lastSeenAt || "").localeCompare(String(a.lastSeenAt || "")));
 }
 
+function getKnownUserAccountId(entry) {
+  if (!entry || typeof entry !== "object") {
+    return "";
+  }
+
+  const email = normalizeEmail(entry.email);
+  if (email) {
+    return email;
+  }
+
+  const providerSubject = String(entry.providerSubject || "").trim();
+  if (providerSubject) {
+    return providerSubject;
+  }
+
+  return String(entry.id || "").trim();
+}
+
+function deleteKnownUserById(userId) {
+  const normalizedUserId = String(userId || "").trim();
+  if (!normalizedUserId) {
+    return { error: "missing_user_id", statusCode: 400 };
+  }
+
+  const userStore = safeReadJson(USER_DB_FILE);
+  userStore.users = dedupeKnownUsers(Array.isArray(userStore.users) ? userStore.users : []);
+
+  const userIndex = userStore.users.findIndex((entry) => String(entry.id || "").trim() === normalizedUserId);
+  if (userIndex === -1) {
+    return { error: "not_found", statusCode: 404 };
+  }
+
+  const removedUser = userStore.users[userIndex];
+  userStore.users.splice(userIndex, 1);
+  safeWriteJson(USER_DB_FILE, userStore);
+
+  const removedAccountId = getKnownUserAccountId(removedUser);
+  let unlinkedChildren = 0;
+
+  if (removedAccountId) {
+    const familyState = readFamilyState();
+    const family = familyState && familyState.family ? familyState.family : null;
+    if (family && Array.isArray(family.children)) {
+      family.children.forEach((child) => {
+        if (String(child.accountId || "").trim() === removedAccountId) {
+          child.accountId = "";
+          unlinkedChildren += 1;
+        }
+      });
+
+      if (unlinkedChildren > 0) {
+        writeFamilyState(familyState);
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    removedUserId: normalizedUserId,
+    removedAccountId,
+    unlinkedChildren
+  };
+}
+
 function pickRelevantHeaders(request) {
   const allowPattern = /(pangolin|auth|user|email|name|forwarded|remote|principal)/i;
   const result = {};
@@ -440,6 +504,25 @@ const server = http.createServer((request, response) => {
     }
 
     sendJson(response, 200, { users: listKnownUsers() });
+    return;
+  }
+
+  if (request.method === "DELETE" && pathname.startsWith("/api/users/")) {
+    if (!ensureTrustedProxy(request)) {
+      sendJson(response, 403, { error: "forbidden" });
+      return;
+    }
+
+    const encodedUserId = pathname.slice("/api/users/".length);
+    const userId = decodeURIComponent(encodedUserId || "");
+    const result = deleteKnownUserById(userId);
+
+    if (result.error) {
+      sendJson(response, result.statusCode, { error: result.error });
+      return;
+    }
+
+    sendJson(response, 200, result);
     return;
   }
 
