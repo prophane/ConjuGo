@@ -1,6 +1,7 @@
 /* global CONJUGO_DATA, BRAINROT_PIPELINE */
 
 const SESSION_SIZE = 10;
+const SESSION_SUCCESS_SCORE = 8;
 const RECENT_VERB_WINDOW = 2;
 const STORAGE_KEY = "conjugo-preferences-v1";
 const PROGRESS_KEY = "conjugo-progress-v1";
@@ -205,6 +206,7 @@ const el = {
   pronounBadge: document.getElementById("pronounBadge"),
   verbLabel: document.getElementById("verbLabel"),
   questionExplain: document.getElementById("questionExplain"),
+  sessionModeHint: document.getElementById("sessionModeHint"),
   optionsWrap: document.getElementById("optionsWrap"),
   feedback: document.getElementById("feedback"),
   feedbackText: document.getElementById("feedbackText"),
@@ -1771,7 +1773,7 @@ function applySessionRewards() {
   progress.totalCorrect += state.score;
   progress.bestScore = Math.max(progress.bestScore, state.score);
 
-  if (state.score >= 8) {
+  if (state.score >= SESSION_SUCCESS_SCORE) {
     progress.currentStreak += 1;
   } else {
     progress.currentStreak = 0;
@@ -1780,7 +1782,7 @@ function applySessionRewards() {
 
   const earnedCoins = state.score + (state.score === SESSION_SIZE ? 4 : 0);
   progress.coins += earnedCoins;
-  const earnedXp = state.score * 10 + (state.score === SESSION_SIZE ? 20 : 0) + (state.score >= 8 ? 10 : 0);
+  const earnedXp = state.score * 10 + (state.score === SESSION_SIZE ? 20 : 0) + (state.score >= SESSION_SUCCESS_SCORE ? 10 : 0);
   progress.xp += earnedXp;
 
   const unlockedCards = unlockCardsForProgress(progress);
@@ -2126,8 +2128,35 @@ function generateQuestions(selectedCategories, total = SESSION_SIZE) {
 
   return questions.map((question) => ({
     ...question,
-    options: buildMcqOptions(question, selectedCategories)
+    options: buildMcqOptions(question, selectedCategories),
+    responseMode: "mcq"
   }));
+}
+
+function getTypedQuestionCountForLevel(level) {
+  if (level < 5) {
+    return 0;
+  }
+
+  return Math.min(3, Math.max(1, level - 4));
+}
+
+function applyProgressiveDifficulty(questions, level) {
+  if (!Array.isArray(questions) || !questions.length) {
+    return questions;
+  }
+
+  const typedCount = Math.min(getTypedQuestionCountForLevel(level), questions.length);
+  if (!typedCount) {
+    return questions;
+  }
+
+  const indices = shuffle(questions.map((_question, index) => index)).slice(0, typedCount);
+  indices.forEach((index) => {
+    questions[index].responseMode = "typed";
+  });
+
+  return questions;
 }
 
 function buildMcqOptions(question, selectedCategories) {
@@ -2177,6 +2206,53 @@ function renderQuestion() {
   el.feedbackText.textContent = "";
   el.optionsWrap.innerHTML = "";
 
+  const isTypedQuestion = question.responseMode === "typed";
+  if (el.sessionModeHint) {
+    el.sessionModeHint.textContent = isTypedQuestion ? "Ecris la bonne forme." : "Choisis le bon mot.";
+  }
+  const typedTotal = state.questions.filter((entry) => entry.responseMode === "typed").length;
+  const typedDone = state.questions
+    .slice(0, state.currentIndex + 1)
+    .filter((entry) => entry.responseMode === "typed").length;
+
+  if (typedTotal > 0) {
+    const typedLabel = isTypedQuestion
+      ? ` · Saisie ${typedDone}/${typedTotal}`
+      : ` · Saisie libre: ${typedTotal}`;
+    el.counter.textContent = `Question ${state.currentIndex + 1}/${SESSION_SIZE}${typedLabel}`;
+  }
+
+  if (isTypedQuestion) {
+    const box = document.createElement("div");
+    box.className = "typed-answer-box";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "typed-answer-input";
+    input.placeholder = "Ecris la bonne forme";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+
+    const submit = document.createElement("button");
+    submit.type = "button";
+    submit.className = "cta small typed-answer-submit";
+    submit.textContent = "Valider";
+    submit.addEventListener("click", () => validateTypedAnswer(input));
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        validateTypedAnswer(input);
+      }
+    });
+
+    box.appendChild(input);
+    box.appendChild(submit);
+    el.optionsWrap.appendChild(box);
+    input.focus();
+    return;
+  }
+
   question.options.forEach((optionText, index) => {
     const button = document.createElement("button");
     button.className = "option";
@@ -2186,6 +2262,86 @@ function renderQuestion() {
     button.addEventListener("click", () => validateAnswer(optionText, button));
     el.optionsWrap.appendChild(button);
   });
+}
+
+function normalizeComparableForm(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[’`]/g, "'")
+    .replace(/\s+/g, " ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function extractTypedVerbForm(inputValue, question) {
+  const normalized = normalizeComparableForm(inputValue);
+  if (!normalized) {
+    return "";
+  }
+
+  const promptPronoun = normalizeComparableForm(getPromptPronoun(question));
+  const pronounLabel = normalizeComparableForm(question.pronounLabel);
+
+  if (promptPronoun === "j'" && normalized.startsWith("j'")) {
+    return normalized.slice(2).trim();
+  }
+
+  if (promptPronoun && normalized.startsWith(`${promptPronoun} `)) {
+    return normalized.slice(promptPronoun.length + 1).trim();
+  }
+
+  if (pronounLabel && normalized.startsWith(`${pronounLabel} `)) {
+    return normalized.slice(pronounLabel.length + 1).trim();
+  }
+
+  return normalized;
+}
+
+function validateTypedAnswer(inputEl) {
+  if (state.answered) {
+    return;
+  }
+
+  const question = state.questions[state.currentIndex];
+  const selectedText = String(inputEl && inputEl.value ? inputEl.value : "").trim();
+  if (!selectedText) {
+    return;
+  }
+
+  state.answered = true;
+  const expectedForm = normalizeComparableForm(extractVerbForm(question.answer));
+  const typedForm = extractTypedVerbForm(selectedText, question);
+  const ok = typedForm === expectedForm;
+
+  const typedInput = el.optionsWrap.querySelector(".typed-answer-input");
+  const typedButton = el.optionsWrap.querySelector(".typed-answer-submit");
+  if (typedInput) {
+    typedInput.disabled = true;
+    typedInput.classList.toggle("is-correct", ok);
+    typedInput.classList.toggle("is-wrong", !ok);
+  }
+  if (typedButton) {
+    typedButton.disabled = true;
+  }
+
+  const canonicalForm = extractVerbForm(question.answer);
+  if (ok) {
+    state.score += 1;
+    el.feedbackText.textContent = `Super! ${formatFullAnswer(question, canonicalForm)}. ${randomFromList(FUNNY_SUCCESS_LINES)}`;
+    triggerRewardAnimation();
+  } else {
+    state.errors.push({
+      verb: question.verb,
+      pronoun: question.pronounLabel,
+      expected: formatFullAnswer(question, canonicalForm),
+      selected: selectedText
+    });
+    el.feedbackText.textContent = `Presque! La bonne phrase: ${formatFullAnswer(question, canonicalForm)}. ${randomFromList(FUNNY_RETRY_LINES)}`;
+  }
+
+  el.feedback.hidden = false;
+  el.nextBtn.focus();
 }
 
 function validateAnswer(selectedText, clickedButton) {
@@ -2247,7 +2403,7 @@ function scoreMessage(score) {
   if (score <= 3) {
     return "Tu progresses! On rejoue pour devenir une mega-star.";
   }
-  if (score <= 7) {
+  if (score < SESSION_SUCCESS_SCORE) {
     return "Bravo! Tu es sur la bonne voie, continue!";
   }
   if (score <= 9) {
@@ -2292,7 +2448,11 @@ function showResults() {
   applySessionRewards();
   showView("result");
   el.scoreLine.textContent = `Score: ${state.score}/${SESSION_SIZE}`;
-  el.resultMessage.textContent = scoreMessage(state.score);
+  const faults = SESSION_SIZE - state.score;
+  const successLine = state.score >= SESSION_SUCCESS_SCORE
+    ? `Questionnaire reussi (${SESSION_SUCCESS_SCORE}/10 ou plus, max ${SESSION_SIZE - SESSION_SUCCESS_SCORE} faute(s)).`
+    : `Questionnaire non valide (${faults} faute(s)). Objectif: au moins ${SESSION_SUCCESS_SCORE}/10.`;
+  el.resultMessage.textContent = `${scoreMessage(state.score)} ${successLine}`;
   renderSessionRewards();
 
   el.errorList.innerHTML = "";
@@ -2316,6 +2476,8 @@ function startSession() {
   }
 
   state.questions = generateQuestions(selectedCategories, SESSION_SIZE);
+  const currentLevel = getProgressLevel(state.progress || defaultProgress()).level;
+  applyProgressiveDifficulty(state.questions, currentLevel);
   state.currentIndex = 0;
   state.score = 0;
   state.errors = [];
