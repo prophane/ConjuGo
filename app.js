@@ -8,6 +8,7 @@ const FAMILY_KEY = "conjugo-family-v1";
 const FAMILY_SERVER_CACHE_KEY = "conjugo-family-server-cache-v1";
 const FAMILY_API_ENDPOINT = "/api/family-state";
 const USERS_API_ENDPOINT = "/api/users";
+const LOGOUT_API_ENDPOINT = "/api/logout";
 const APP_VERSION = "v2026.05.27.1";
 const STICKER_CATALOG_SIZE = 30;
 const SELF_SELECTION_ID = "__self__";
@@ -76,6 +77,8 @@ const el = {
   activeChildSelect: document.getElementById("activeChildSelect"),
   parentModeBtn: document.getElementById("parentModeBtn"),
   leaveParentModeBtn: document.getElementById("leaveParentModeBtn"),
+  refreshIdentityBtn: document.getElementById("refreshIdentityBtn"),
+  logoutBtn: document.getElementById("logoutBtn"),
   openAdminBtn: document.getElementById("openAdminBtn"),
   progressChildLine: document.getElementById("progressChildLine"),
   parentAdminPanel: document.getElementById("parentAdminPanel"),
@@ -833,6 +836,68 @@ async function loadConnectedUser() {
   }
 }
 
+async function requestLogoutInfo() {
+  try {
+    const response = await fetch(LOGOUT_API_ENDPOINT, {
+      method: "POST",
+      cache: "no-store"
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, logoutUrl: "" };
+    }
+    return {
+      ok: true,
+      logoutUrl: String(payload.logoutUrl || "").trim()
+    };
+  } catch (_error) {
+    return { ok: false, logoutUrl: "" };
+  }
+}
+
+function clearLocalIdentityState() {
+  localStorage.removeItem(FAMILY_KEY);
+  localStorage.removeItem(PROGRESS_KEY);
+  localStorage.removeItem(FAMILY_SERVER_CACHE_KEY);
+  state.isParentMode = false;
+  state.user = null;
+}
+
+async function handleRefreshIdentity() {
+  const previousAccountId = getUserAccountId(state.user);
+  await loadConnectedUser();
+  const nextAccountId = getUserAccountId(state.user);
+
+  if (!nextAccountId) {
+    showAdminMessage("Identite introuvable. Verifie la session SSO.");
+    return;
+  }
+
+  if (previousAccountId && previousAccountId !== nextAccountId) {
+    showAdminMessage("Changement de compte detecte. Pense a verifier le profil actif.");
+    return;
+  }
+
+  showAdminMessage("Compte recharge.");
+}
+
+async function handleLogout() {
+  const confirmed = window.confirm("Se deconnecter de Conjugo sur cet appareil ?");
+  if (!confirmed) {
+    return;
+  }
+
+  const logoutInfo = await requestLogoutInfo();
+  clearLocalIdentityState();
+
+  if (logoutInfo.logoutUrl) {
+    window.location.href = logoutInfo.logoutUrl;
+    return;
+  }
+
+  window.location.reload();
+}
+
 function defaultFamily() {
   return {
     parent: {
@@ -879,6 +944,23 @@ function getActiveChild() {
   return state.family.children.find((child) => child.id === state.activeChildId) || null;
 }
 
+function normalizeChildName(name) {
+  return String(name || "").trim().toLowerCase();
+}
+
+function findChildByName(name) {
+  if (!state.family || !Array.isArray(state.family.children)) {
+    return null;
+  }
+
+  const normalizedName = normalizeChildName(name);
+  if (!normalizedName) {
+    return null;
+  }
+
+  return state.family.children.find((child) => normalizeChildName(child.name) === normalizedName) || null;
+}
+
 function ensureFamilyShape(input) {
   const fallback = defaultFamily();
   if (!input || typeof input !== "object") {
@@ -911,6 +993,38 @@ function ensureFamilyShape(input) {
   if (children.length === 1 && isLegacyPlaceholderChild(children[0])) {
     children = [];
   }
+
+  const dedupedChildren = [];
+  const seenById = new Set();
+  const seenByAccountId = new Set();
+  const seenByExactTriplet = new Set();
+
+  children.forEach((child) => {
+    const childId = String(child.id || "").trim();
+    const accountId = String(child.accountId || "").trim();
+    const exactTriplet = `${normalizeChildName(child.name)}|${cleanPin(child.pin)}|${accountId}`;
+
+    if (childId && seenById.has(childId)) {
+      return;
+    }
+    if (accountId && seenByAccountId.has(accountId)) {
+      return;
+    }
+    if (seenByExactTriplet.has(exactTriplet)) {
+      return;
+    }
+
+    if (childId) {
+      seenById.add(childId);
+    }
+    if (accountId) {
+      seenByAccountId.add(accountId);
+    }
+    seenByExactTriplet.add(exactTriplet);
+    dedupedChildren.push(child);
+  });
+
+  children = dedupedChildren;
 
   const requestedSelectionId = String(input.activeChildId || "").trim();
   const activeChildId = isSelfSelection(requestedSelectionId)
@@ -2304,6 +2418,12 @@ function bindEvents() {
   }
   if (el.leaveParentModeBtn) {
     el.leaveParentModeBtn.addEventListener("click", handleLeaveParentMode);
+  }
+  if (el.refreshIdentityBtn) {
+    el.refreshIdentityBtn.addEventListener("click", handleRefreshIdentity);
+  }
+  if (el.logoutBtn) {
+    el.logoutBtn.addEventListener("click", handleLogout);
   }
   if (el.addChildForm) {
     el.addChildForm.addEventListener("submit", handleAddChild);

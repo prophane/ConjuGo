@@ -10,6 +10,7 @@ const FAMILY_DB_FILE = process.env.FAMILY_DB_FILE || path.join(__dirname, "data"
 const SSO_SUB_HEADER = (process.env.SSO_SUB_HEADER || "x-pangolin-sub").toLowerCase();
 const SSO_EMAIL_HEADER = (process.env.SSO_EMAIL_HEADER || "x-pangolin-email").toLowerCase();
 const SSO_NAME_HEADER = (process.env.SSO_NAME_HEADER || "x-pangolin-name").toLowerCase();
+const SSO_LOGOUT_URL = process.env.SSO_LOGOUT_URL || "";
 const TRUST_PROXY_HEADER = (process.env.TRUST_PROXY_HEADER || "x-pangolin-trusted").toLowerCase();
 const TRUST_PROXY_SECRET = process.env.TRUST_PROXY_SECRET || "";
 
@@ -460,6 +461,7 @@ const server = http.createServer((request, response) => {
     sendJson(response, 200, {
       ok: true,
       service: "conjugo",
+      ssoLogoutConfigured: Boolean(SSO_LOGOUT_URL),
       ssoHeaders: {
         sub: uniqueNames(SUB_HEADER_CANDIDATES),
         email: uniqueNames(EMAIL_HEADER_CANDIDATES),
@@ -504,6 +506,14 @@ const server = http.createServer((request, response) => {
     }
 
     sendJson(response, 200, { users: listKnownUsers() });
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/logout") {
+    sendJson(response, 200, {
+      ok: true,
+      logoutUrl: SSO_LOGOUT_URL
+    });
     return;
   }
 
