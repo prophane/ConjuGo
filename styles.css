@@ -988,6 +988,24 @@ h1 {
   margin-top: 10px;
 }
 
+#rewardCard .pack-card {
+  width: min(100%, 420px);
+  margin: 0 auto;
+}
+
+#rewardCard .brainrot-stage,
+#rewardCard .brainrot-stage.is-large {
+  width: 100%;
+  min-height: 210px;
+  max-height: 230px;
+}
+
+#rewardCard .brainrot-stage img {
+  width: 100%;
+  height: 210px;
+  object-fit: contain;
+}
+
 .pack-card {
   border-radius: 16px;
   padding: 10px;
