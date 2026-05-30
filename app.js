@@ -1012,6 +1012,10 @@ function isConnectedParent() {
 
   const parentAccountId = String(state.family.parent.accountId || "").trim();
   const userAccountId = getUserAccountId(state.user);
+  const linkedChild = state.family.children.find((child) => String(child.accountId || "").trim() === userAccountId) || null;
+  if (linkedChild) {
+    return false;
+  }
   return Boolean(parentAccountId && userAccountId && parentAccountId === userAccountId);
 }
 
@@ -1034,6 +1038,17 @@ function ensureParentIdentityFromUser() {
   state.family.parent = state.family.parent || {};
   const userAccountId = getUserAccountId(state.user);
   if (!userAccountId) {
+    return;
+  }
+
+  const parentAccountId = String(state.family.parent.accountId || "").trim();
+  const linkedChild = state.family.children.find((child) => String(child.accountId || "").trim() === userAccountId) || null;
+
+  if (linkedChild) {
+    return;
+  }
+
+  if (parentAccountId && parentAccountId !== userAccountId) {
     return;
   }
 
@@ -1201,6 +1216,18 @@ function ensureFamilyShape(input) {
 
   children = Array.from(mergedByName.values());
 
+  const childAccountIds = new Set(
+    children
+      .map((child) => String(child.accountId || "").trim())
+      .filter((accountId) => Boolean(accountId))
+  );
+
+  const sanitizedParentAccountId = childAccountIds.has(parentAccountId) ? "" : parentAccountId;
+  if (!sanitizedParentAccountId) {
+    settings.parentUnlocked = false;
+    settings.parentPinValidatedAt = 0;
+  }
+
   const requestedSelectionId = String(input.activeChildId || "").trim();
   const activeChildId = isSelfSelection(requestedSelectionId)
     ? SELF_SELECTION_ID
@@ -1211,7 +1238,7 @@ function ensureFamilyShape(input) {
         : SELF_SELECTION_ID;
 
   return {
-    parent: { name: parentName, pin: parentPin, accountId: parentAccountId },
+    parent: { name: parentName, pin: parentPin, accountId: sanitizedParentAccountId },
     settings,
     children,
     activeChildId
